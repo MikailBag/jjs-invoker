@@ -14,33 +14,6 @@ env:
   RUSTC_BOOTSTRAP: 1
   DOCKER_BUILDKIT: 1
 jobs:
-  hack:
-    name: hack
-    runs-on: "ubuntu-18.04"
-    steps:
-      - name: Success
-        run: echo "Success"
-  helm:
-    name: helm
-    runs-on: "ubuntu-20.04"
-    steps:
-      - uses: actions/checkout@v2
-      - name: Run helm lint
-        run: |
-          helm lint k8s/jjs
-      - name: Render chart
-        run: helm template k8s/jjs -f ci-data/helm-lint-values.yaml > ./objects.yaml
-      - name: Run Kube-score
-        run: |
-          brew install kube-score/tap/kube-score
-          kube-score score --ignore-test=container-resources objects.yaml
-      - name: Run Polaris
-        run: |
-          brew tap FairwindsOps/tap
-          brew install FairwindsOps/tap/polaris
-
-          echo "--- Running polaris audir ---"
-          polaris audit --audit-path ./objects.yaml --format yaml || true
   cargo-deny:
     name: cargo-deny
     runs-on: "ubuntu-20.04"
@@ -49,37 +22,6 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check all
-  py-fmt:
-    name: py-fmt
-    runs-on: "ubuntu-18.04"
-    steps:
-      - uses: actions/checkout@v1
-      - $include: rustc
-      - $include: python
-      - name: check python code formatting
-        run: |
-          pip3 install autopep8
-          cd src
-          cargo jjs-check --no-default --autopep8
-  py-test:
-    name: py-test
-    runs-on: "ubuntu-18.04"
-    services:
-      mongo:
-        image: mongo:4.2.6-bionic
-        ports:
-          - 27017:27017
-    env:
-      MONGODB_CONNECTION_STRING: mongodb://localhost:27017
-    steps:
-      - uses: actions/checkout@v2
-      - $include: python
-      - name: run python tests
-        run: |
-          pip3 install pytest
-          cd src/apiserver
-          pip3 install -r requirements.txt
-          python -m pytest
   misspell:
     name: misspell
     runs-on: "ubuntu-18.04"
@@ -100,8 +42,6 @@ jobs:
         with:
           command: fmt
           args: -- --check
-      - name: Run shellcheck
-        run: cargo jjs-check --no-default --shellcheck
   clippy:
     name: clippy
     runs-on: "ubuntu-18.04"
@@ -113,19 +53,6 @@ jobs:
         with:
           command: clippy
           args: --workspace -- -Dwarnings
-  cpp:
-    name: cpp
-    runs-on: "ubuntu-18.04"
-    steps:
-      - uses: actions/checkout@v1
-      - $include: sysdeps
-      - $include: rustc
-      - name: Install clang static analyzer
-        run: sudo apt install clang-tools
-      - name: compile testlib
-        run: cargo jjs-check --no-default --testlib
-      - name: Run static analyzer
-        run: cargo jjs-check --no-default --clang-analyzer
   unit-tests:
     name: unit-tests
     runs-on: "ubuntu-18.04"
@@ -154,11 +81,11 @@ jobs:
         uses: actions/cache@v1.1.0
         with:
           path: ~/udeps
-          key: ${{ runner.os }}-udeps-bin-${{ steps.rustc_version.outputs.version }}-v0.1.11
+          key: ${{ runner.os }}-udeps-bin-${{ steps.rustc_version.outputs.version }}-v0.1.16
       - name: Install cargo-udeps
         if: steps.cache_udeps.outputs.cache-hit != 'true'
         run: |
-          cargo install cargo-udeps --locked --version 0.1.11
+          cargo install cargo-udeps --locked --version 0.1.16
           mkdir -p ~/udeps
           cp $( which cargo-udeps ) ~/udeps
       - name: Cache build dir
@@ -170,44 +97,22 @@ jobs:
         run: |
           export PATH=~/udeps:$PATH
           cargo udeps
-  codegen:
-    name: codegen
-    runs-on: "ubuntu-18.04"
-    steps:
-      - uses: actions/checkout@v1
-      - name: Free space
-        run: sudo bash ci-data/free-space.sh
-      - $include: sysdeps
-      - $include: rustc-nightly
-      - $include: pkg-login
-      - $include: python
-      - run: pip install -r src/apiserver/requirements.txt
-      - run: cargo jjs codegen
-      - run: git diff --exit-code
-      - if: failure()
-        name: Collect some information
-        run: |
-          echo Collecting git patch
-          git add .
-
-          git config --global user.email "you@example.com"
-          git config --global user.name "Your Name"
-          git commit --message "temp"
-          git show --patch > /tmp/patch
-      - if: failure()
-        name: Upload patch
-        uses: actions/upload-artifact@v2
-        with:
-          name: codegen-diff
-          path: /tmp/patch
-  smoke:
-    name: smoke
+  e2e:
+    name: e2e
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
       - $include: sysdeps
+      - name: Install latest docker
+        run: |
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+          sudo add-apt-repository \
+            "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+            $(lsb_release -cs) \
+            stable"
+          sudo apt-get update
+          sudo apt-get install -y docker-ce docker-ce-cli containerd.io
       - $include: rustc
-      - $include: python
       - name: Get Rust version
         id: rustc_version
         run: |
@@ -217,55 +122,16 @@ jobs:
         uses: actions/cache@v2
         with:
           path: target
-          key: ${{ runner.os }}-smoke-${{ steps.rustc_version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
-      - name: Build jjs images
-        run: |
-          mkdir artifacts
-          DOCKER_OPT="--enable-docker --docker-tag=% --with-docker=docker"
-          FEAT_OPT="--enable-feature k8s"
-          COMPONENT_OPT="--enable daemons --enable tools"
-          cargo jjs-build --out artifacts $DOCKER_OPT $FEAT_OPT $COMPONENT_OPT
-      - name: Setup k3s
-        run: |
-          curl -sfL https://get.k3s.io | sh -s - --write-kubeconfig ~/.kube/config --docker
-          sudo chown $( whoami ) ~/.kube/config
-      - name: Install dependencies
-        run: |
-          helm repo add bitnami https://charts.bitnami.com/bitnami
-          helm install mongodb bitnami/mongodb -f ci-data/mongodb-values.yaml --wait --timeout 75s
-      - name: Install jjs
-        run: |
-          helm install jjs k8s/jjs --wait --values ci-data/values.yaml --timeout 75s
-          kubectl wait --for condition=complete --timeout 90s jobs/init 
+          key: ${{ runner.os }}-e2e-${{ steps.rustc_version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
+      - name: Build invoker
+        run: docker build -f Dockerfile -t jjs-invoker .
       - name: Run tests
         run: |
-          cd smoke
-          JP="{.spec.ports[0].nodePort}"
-          export JJS_API="http://localhost:$( kubectl get svc apiserver "--output=jsonpath=$JP" )"
-          export JJS_BEARER=Dev::root
-          pip install -r requirements.txt
-
-          python -m pytest .
-      - name: Collect debugging information
-        if: failure()
-        run: |
-          mkdir /tmp/kdump
-          MOUNT1="--mount type=bind,source=/tmp/kdump,target=/dump"
-          MOUNT2="--mount type=bind,source=/home/runner/.kube,target=/kube"
-          DUMP_OPTS="--escape-paths --generic-strip=managed-fields"
-          docker run -i --rm $MOUNT1 $MOUNT2 --network host mikailbag/kube-dump /dump $DUMP_OPTS
-
-          helm get manifest jjs > /tmp/rendered-objects
-
-      - name: Upload cluster state dump
+          mkdir /tmp/logs
+          cargo run -p test-runner -- --image=jjs-invoker --logs=/tmp/logs
+      - name: Upload logs
         if: failure()
         uses: actions/upload-artifact@v2
         with:
-          name: kube-dump
-          path: /tmp/kdump
-      - name: Upload rendered manifests
-        if: failure()
-        uses: actions/upload-artifact@v2
-        with:
-          name: helm-manifests
-          path: /tmp/rendered-objects
+          name: invoker-logs
+          path: /tmp/logs

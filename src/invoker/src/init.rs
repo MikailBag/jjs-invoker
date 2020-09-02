@@ -1,12 +1,6 @@
 //! platform-specific initialization
-use anyhow::{bail, Context};
+use anyhow::Context;
 use nix::sched::CloneFlags;
-fn check_system() -> anyhow::Result<()> {
-    if let Some(err) = minion::check() {
-        bail!("invoker is not able to test runs: {}", err);
-    }
-    Ok(())
-}
 
 fn unshare_mount_namespace() -> anyhow::Result<()> {
     nix::sched::unshare(CloneFlags::CLONE_NEWNS).context("unshare() fail")
@@ -36,7 +30,6 @@ fn unshare() -> anyhow::Result<()> {
 }
 
 pub fn init() -> anyhow::Result<()> {
-    check_system().context("system configuration problem detected")?;
     unshare().context("failed to create namespaces")?;
     Ok(())
 }

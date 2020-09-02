@@ -1,0 +1,104 @@
+inputs:
+  - fileId: test
+    source:
+      localFile:
+        path: /test/input.txt
+steps:
+  - stage: 0
+    action:
+      executeCommand:
+        sandboxName: compile
+        cwd: /
+        argv:
+          - g++
+          - /prog.cpp
+          - -o
+          - /out/bin
+        env: []
+        stdio:
+          stdin: dev-null
+          stdout: compile-stdout
+          stderr: compile-stderr
+  - stage: 0
+    action:
+      createFile:
+        id: compile-stdout
+        readable: true
+        writeable: true
+  - stage: 0
+    action:
+      createFile:
+        id: compile-stderr
+        readable: true
+        writeable: true
+  - stage: 0
+    action:
+      openNullFile:
+        id: dev-null
+  - stage: 0
+    action:
+      createSandbox:
+        name: compile
+        baseImage: /base
+        workDir: /jjs
+        expose:
+          - hostPath: /test/prog.cpp
+            sandboxPath: /prog.cpp
+            mode: readOnly
+          - hostPath: /tmp/
+            sandboxPath: /out/
+            mode: readWrite
+        limits:
+          memory: 256000000
+          time: 5000
+          processCount: 16
+          workDirSize: 32000000
+  - stage: 1
+    action:
+      executeCommand:
+        sandboxName: exec
+        cwd: /
+        argv:
+          - /inp/bin
+        env: []
+        stdio:
+          stdin: exec-stdin
+          stdout: exec-stdout
+          stderr: exec-stderr
+  - stage: 1
+    action:
+      createFile:
+        id: exec-stdout
+        readable: true
+        writeable: true
+  - stage: 1
+    action:
+      createFile:
+        id: exec-stderr
+        readable: true
+        writeable: true
+  - stage: 1
+    action:
+      openFile:
+        id: exec-stdin
+        path: /test/input.txt
+  - stage: 1
+    action:
+      createSandbox:
+        name: exec
+        baseImage: /base
+        workDir: /jjs
+        expose:
+          - hostPath: /tmp/
+            sandboxPath: /inp
+            mode: readOnly
+        limits:
+          memory: 256000000
+          time: 5000
+          processCount: 16
+          workDirSize: 32000000
+outputs:
+  - fileId: compile-stdout
+  - fileId: compile-stderr
+  - fileId: exec-stdout
+  - fileId: exec-stderr
