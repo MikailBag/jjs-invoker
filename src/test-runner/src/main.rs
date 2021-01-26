@@ -63,7 +63,6 @@ fn main() -> anyhow::Result<()> {
         xshell::cmd!(
             "docker create 
             --publish-all 
-            --cgroupns host
             --name {container_name}
             --mount type=bind,ro=true,src={base_dir_path},dst=/base
             --mount type=bind,src={work_dir_path},dst=/var/judges
