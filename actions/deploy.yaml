@@ -8,21 +8,17 @@ env:
   CI: 1
   RUST_BACKTRACE: full
   RUSTC_BOOTSTRAP: 1
+  DOCKER_BUILDKIT: 1
 jobs:
   docker:
     name: docker
-    runs-on: "ubuntu-18.04"
+    runs-on: "ubuntu-20.04"
     steps:
       - uses: actions/checkout@v2
-      - $include: rustc
-      - $include: sysdeps
-      - name: Build images
+      - name: Build invoker
         run: |
-          mkdir artifacts
-          DOCKER_OPT="--enable-docker --docker-tag=% --docker-tags-log=/tmp/taglog.txt --with-docker=docker"
-          cargo jjs-build --out artifacts $DOCKER_OPT --enable=tools --enable=daemons
+          docker build -t ghcr.io/jjs-dev/jjs-invoker:latest .
       - name: Upload images
         run: |
-          docker login --username jjs-dev --password ${{ secrets.GITHUB_TOKEN }} docker.pkg.github.com
-          echo "${{ secrets.GCR_UPLOAD_JSON_KEY }}" | base64 --decode | docker login --username _json_key --password-stdin gcr.io
-          python3 ci-data/push_images.py
+          echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
+          docker push ghcr.io/jjs-dev/jjs-invoker:latest
