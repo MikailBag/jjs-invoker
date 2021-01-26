@@ -7,9 +7,42 @@ use std::{
 use tokio::fs;
 use tracing::{debug, error};
 
+/// Owns `tmpfs`, mounted into sandbox.
+struct Tmpfs {
+    path: PathBuf,
+}
+
+impl Tmpfs {
+    #[cfg(target_os = "linux")]
+    fn new(settings: &SandboxSettings, path: &Path) -> anyhow::Result<Self> {
+        let quota = settings.limits.work_dir_size;
+        let quota = minion::linux::ext::Quota::bytes(quota);
+        minion::linux::ext::make_tmpfs(path, quota)
+            .context("failed to set size limit on shared directory")?;
+        Ok(Tmpfs {
+            path: path.to_path_buf(),
+        })
+    }
+}
+
+impl Drop for Tmpfs {
+    fn drop(&mut self) {
+        if let Err(err) = nix::mount::umount2(&self.path, nix::mount::MntFlags::MNT_DETACH) {
+            error!(
+                "Leaking tmpfs at {}: umount2 failed: {}",
+                self.path.display(),
+                err
+            )
+        } else {
+            debug!("Successfully destroyed tmpfs at {}", self.path.display())
+        }
+    }
+}
+
 pub struct Sandbox {
     sandbox: Box<dyn minion::erased::Sandbox>,
-    umount: Option<PathBuf>,
+    // RAII owner
+    _tmpfs: Tmpfs,
 }
 
 pub struct SandboxGlobalSettings {
@@ -23,7 +56,7 @@ impl Sandbox {
     }
 
     pub async fn create(
-        work_dir: &Path,
+        sandbox_data_dir: &Path,
         backend: &dyn minion::erased::Backend,
         settings: &SandboxSettings,
         global_settings: &SandboxGlobalSettings,
@@ -73,30 +106,23 @@ impl Sandbox {
             shared_dirs.push(shared_dir);
         }
 
-        tokio::fs::create_dir_all(&work_dir)
+        tokio::fs::create_dir_all(&sandbox_data_dir)
             .await
-            .context("failed to create working directory")?;
-        let umount_path;
-        #[cfg(target_os = "linux")]
-        {
-            let quota = settings.limits.work_dir_size;
-            let quota = minion::linux::ext::Quota::bytes(quota);
-            minion::linux::ext::make_tmpfs(&work_dir.join("data"), quota)
-                .context("failed to set size limit on shared directory")?;
-            umount_path = Some(work_dir.join("data"));
-        }
-        #[cfg(not(target_os = "linux"))]
-        {
-            umount_path = None;
-        }
+            .context("failed to create sandbox data directory")?;
+
+        let sandbox_work_dir = sandbox_data_dir.join("data");
+
+        let t = Tmpfs::new(settings, &sandbox_work_dir)
+            .context("failed to allocate sandbox working directory")?;
+
         shared_dirs.push(minion::SharedDir {
-            src: work_dir.join("data"),
+            src: sandbox_work_dir,
             dest: settings.work_dir.clone(),
             kind: minion::SharedDirKind::Full,
         });
         let cpu_time_limit = Duration::from_millis(settings.limits.time);
         let real_time_limit = Duration::from_millis(settings.limits.time * 3);
-        let chroot_dir = work_dir.join("root");
+        let chroot_dir = sandbox_data_dir.join("root");
         tokio::fs::create_dir(&chroot_dir)
             .await
             .with_context(|| format!("failed to create chroot dir {}", chroot_dir.display()))?;
@@ -105,31 +131,14 @@ impl Sandbox {
             max_alive_process_count: settings.limits.process_count as _,
             memory_limit: settings.limits.memory,
             exposed_paths: shared_dirs,
-            isolation_root: work_dir.join("root"),
+            isolation_root: chroot_dir,
             cpu_time_limit,
             real_time_limit,
         };
         let sandbox = backend
             .new_sandbox(sandbox_options)
             .context("failed to create minion dominion")?;
-        Ok(Sandbox {
-            sandbox,
-            umount: umount_path,
-        })
-    }
-}
-
-impl Drop for Sandbox {
-    fn drop(&mut self) {
-        if let Some(p) = self.umount.take() {
-            if let Err(err) = nix::mount::umount2(&p, nix::mount::MntFlags::MNT_DETACH) {
-                error!("Leaking tmpfs at {}: umount2 failed: {}", p.display(), err)
-            } else {
-                debug!("Successfully destroyed tmpfs at {}", p.display())
-            }
-        } else {
-            panic!("TODO, REMOVE: winda??")
-        }
+        Ok(Sandbox { sandbox, _tmpfs: t })
     }
 }
 
