@@ -15,25 +15,6 @@ env:
   RUSTC_BOOTSTRAP: 1
   DOCKER_BUILDKIT: 1
 jobs:
-  hack:
-    name: hack
-    runs-on: ubuntu-18.04
-    steps:
-      - name: Success
-        run: "echo \"Success\""
-  helm:
-    name: helm
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-      - name: Run helm lint
-        run: "helm lint k8s/jjs\n"
-      - name: Render chart
-        run: helm template k8s/jjs -f ci-data/helm-lint-values.yaml > ./objects.yaml
-      - name: Run Kube-score
-        run: "brew install kube-score/tap/kube-score\nkube-score score --ignore-test=container-resources objects.yaml\n"
-      - name: Run Polaris
-        run: "brew tap FairwindsOps/tap\nbrew install FairwindsOps/tap/polaris\n\necho \"--- Running polaris audir ---\"\npolaris audit --audit-path ./objects.yaml --format yaml || true\n"
   cargo-deny:
     name: cargo-deny
     runs-on: ubuntu-20.04
@@ -42,41 +23,6 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check all
-  py-fmt:
-    name: py-fmt
-    runs-on: ubuntu-18.04
-    steps:
-      - uses: actions/checkout@v1
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          components: "clippy,rustfmt"
-          override: true
-      - name: Setup Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: "3.8"
-      - name: check python code formatting
-        run: "pip3 install autopep8\ncd src\ncargo jjs-check --no-default --autopep8\n"
-  py-test:
-    name: py-test
-    runs-on: ubuntu-18.04
-    services:
-      mongo:
-        image: "mongo:4.2.6-bionic"
-        ports:
-          - "27017:27017"
-    env:
-      MONGODB_CONNECTION_STRING: "mongodb://localhost:27017"
-    steps:
-      - uses: actions/checkout@v2
-      - name: Setup Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: "3.8"
-      - name: run python tests
-        run: "pip3 install pytest\ncd src/apiserver\npip3 install -r requirements.txt\npython -m pytest\n"
   misspell:
     name: misspell
     runs-on: ubuntu-18.04
@@ -102,8 +48,6 @@ jobs:
         with:
           command: fmt
           args: "-- --check"
-      - name: Run shellcheck
-        run: cargo jjs-check --no-default --shellcheck
   clippy:
     name: clippy
     runs-on: ubuntu-18.04
@@ -120,25 +64,6 @@ jobs:
         with:
           command: clippy
           args: "--workspace -- -Dwarnings"
-  cpp:
-    name: cpp
-    runs-on: ubuntu-18.04
-    steps:
-      - uses: actions/checkout@v1
-      - name: Install system dependencies
-        run: sudo apt-get install -y libssl-dev cmake
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          components: "clippy,rustfmt"
-          override: true
-      - name: Install clang static analyzer
-        run: sudo apt install clang-tools
-      - name: compile testlib
-        run: cargo jjs-check --no-default --testlib
-      - name: Run static analyzer
-        run: cargo jjs-check --no-default --clang-analyzer
   unit-tests:
     name: unit-tests
     runs-on: ubuntu-18.04
@@ -177,10 +102,10 @@ jobs:
         uses: actions/cache@v1.1.0
         with:
           path: ~/udeps
-          key: "${{ runner.os }}-udeps-bin-${{ steps.rustc_version.outputs.version }}-v0.1.11"
+          key: "${{ runner.os }}-udeps-bin-${{ steps.rustc_version.outputs.version }}-v0.1.16"
       - name: Install cargo-udeps
         if: "steps.cache_udeps.outputs.cache-hit != 'true'"
-        run: "cargo install cargo-udeps --locked --version 0.1.11\nmkdir -p ~/udeps\ncp $( which cargo-udeps ) ~/udeps\n"
+        run: "cargo install cargo-udeps --locked --version 0.1.16\nmkdir -p ~/udeps\ncp $( which cargo-udeps ) ~/udeps\n"
       - name: Cache build dir
         uses: actions/cache@v1.1.0
         with:
@@ -188,56 +113,21 @@ jobs:
           key: "${{ runner.os }}-udeps-${{ steps.rustc_version.outputs.version }}-${{ hashFiles('Cargo.lock') }}"
       - name: cargo-udeps
         run: "export PATH=~/udeps:$PATH\ncargo udeps\n"
-  codegen:
-    name: codegen
-    runs-on: ubuntu-18.04
-    steps:
-      - uses: actions/checkout@v1
-      - name: Free space
-        run: sudo bash ci-data/free-space.sh
-      - name: Install system dependencies
-        run: sudo apt-get install -y libssl-dev cmake
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly-2020-08-28
-          components: "clippy,rustfmt"
-          override: true
-      - name: Log into Github Package Registry
-        run: "echo \"${{ secrets.GITHUB_TOKEN }}\" | docker login docker.pkg.github.com -u jjs-dev --password-stdin"
-      - name: Setup Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: "3.8"
-      - run: pip install -r src/apiserver/requirements.txt
-      - run: cargo jjs codegen
-      - run: git diff --exit-code
-      - if: failure()
-        name: Collect some information
-        run: "echo Collecting git patch\ngit add .\n\ngit config --global user.email \"you@example.com\"\ngit config --global user.name \"Your Name\"\ngit commit --message \"temp\"\ngit show --patch > /tmp/patch\n"
-      - if: failure()
-        name: Upload patch
-        uses: actions/upload-artifact@v2
-        with:
-          name: codegen-diff
-          path: /tmp/patch
-  smoke:
-    name: smoke
+  e2e:
+    name: e2e
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
       - name: Install system dependencies
         run: sudo apt-get install -y libssl-dev cmake
+      - name: Install latest docker
+        run: "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -\nsudo add-apt-repository \\\n  \"deb [arch=amd64] https://download.docker.com/linux/ubuntu \\\n  $(lsb_release -cs) \\\n  stable\"\nsudo apt-get update\nsudo apt-get install -y docker-ce docker-ce-cli containerd.io\n"
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           components: "clippy,rustfmt"
           override: true
-      - name: Setup Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: "3.8"
       - name: Get Rust version
         id: rustc_version
         run: "rust_version=$(rustc --version | md5sum | cut -f 1-1 -d ' ')\necho \"##[set-output name=version;]$(echo $rust_version)\"\n"
@@ -245,29 +135,14 @@ jobs:
         uses: actions/cache@v2
         with:
           path: target
-          key: "${{ runner.os }}-smoke-${{ steps.rustc_version.outputs.version }}-${{ hashFiles('Cargo.lock') }}"
-      - name: Build jjs images
-        run: "mkdir artifacts\nDOCKER_OPT=\"--enable-docker --docker-tag=% --with-docker=docker\"\nFEAT_OPT=\"--enable-feature k8s\"\nCOMPONENT_OPT=\"--enable daemons --enable tools\"\ncargo jjs-build --out artifacts $DOCKER_OPT $FEAT_OPT $COMPONENT_OPT\n"
-      - name: Setup k3s
-        run: "curl -sfL https://get.k3s.io | sh -s - --write-kubeconfig ~/.kube/config --docker\nsudo chown $( whoami ) ~/.kube/config\n"
-      - name: Install dependencies
-        run: "helm repo add bitnami https://charts.bitnami.com/bitnami\nhelm install mongodb bitnami/mongodb -f ci-data/mongodb-values.yaml --wait --timeout 75s\n"
-      - name: Install jjs
-        run: "helm install jjs k8s/jjs --wait --values ci-data/values.yaml --timeout 75s\nkubectl wait --for condition=complete --timeout 90s jobs/init \n"
+          key: "${{ runner.os }}-e2e-${{ steps.rustc_version.outputs.version }}-${{ hashFiles('Cargo.lock') }}"
+      - name: Build invoker
+        run: docker build -f Dockerfile -t jjs-invoker .
       - name: Run tests
-        run: "cd smoke\nJP=\"{.spec.ports[0].nodePort}\"\nexport JJS_API=\"http://localhost:$( kubectl get svc apiserver \"--output=jsonpath=$JP\" )\"\nexport JJS_BEARER=Dev::root\npip install -r requirements.txt\n\npython -m pytest .\n"
-      - name: Collect debugging information
-        if: failure()
-        run: "mkdir /tmp/kdump\nMOUNT1=\"--mount type=bind,source=/tmp/kdump,target=/dump\"\nMOUNT2=\"--mount type=bind,source=/home/runner/.kube,target=/kube\"\nDUMP_OPTS=\"--escape-paths --generic-strip=managed-fields\"\ndocker run -i --rm $MOUNT1 $MOUNT2 --network host mikailbag/kube-dump /dump $DUMP_OPTS\n\nhelm get manifest jjs > /tmp/rendered-objects\n"
-      - name: Upload cluster state dump
+        run: "mkdir /tmp/logs\ncargo run -p test-runner -- --image=jjs-invoker --logs=/tmp/logs\n"
+      - name: Upload logs
         if: failure()
         uses: actions/upload-artifact@v2
         with:
-          name: kube-dump
-          path: /tmp/kdump
-      - name: Upload rendered manifests
-        if: failure()
-        uses: actions/upload-artifact@v2
-        with:
-          name: helm-manifests
-          path: /tmp/rendered-objects
+          name: invoker-logs
+          path: /tmp/logs

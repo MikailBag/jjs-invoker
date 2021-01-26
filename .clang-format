@@ -1,5 +1,0 @@
-BasedOnStyle: LLVM
-PointerAlignment: Left
-IndentWidth: 4
-SpaceAfterCStyleCast: true
-SpaceBeforeCpp11BracedList: true

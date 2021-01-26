@@ -1,14 +1,9 @@
 status = [
-'hack',
 'style',
 'clippy',
-'cpp',
 'unit-tests',
 'udeps',
-'codegen',
-'py-test',
-'py-fmt',
-'smoke'
+'e2e'
 ]
 delete-merged-branches = true
 timeout-sec = 900
