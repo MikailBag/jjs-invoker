@@ -1,6 +1,8 @@
 use crate::api::{SandboxSettings, SharedDirectoryMode};
 use anyhow::Context as _;
+use minion::{SharedDir, SharedDirKind};
 use std::{
+    os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -120,6 +122,11 @@ impl Sandbox {
             dest: settings.work_dir.clone(),
             kind: minion::SharedDirKind::Full,
         });
+
+        for item in &shared_dirs {
+            validate_shared_item(item).await;
+        }
+
         let cpu_time_limit = Duration::from_millis(settings.limits.time);
         let real_time_limit = Duration::from_millis(settings.limits.time * 3);
         let chroot_dir = sandbox_data_dir.join("root");
@@ -150,3 +157,38 @@ static DEFAULT_HOST_MOUNTS: once_cell::sync::Lazy<Vec<String>> = once_cell::sync
         "lib64".to_string(),
     ]
 });
+
+async fn validate_shared_item(item: &SharedDir) {
+    if let Err(e) = do_validate_shared_item(item).await {
+        tracing::warn!(
+            "Exposed path {} seems to be unusable: {:#}",
+            item.src.display(),
+            e
+        );
+    }
+}
+
+async fn do_validate_shared_item(item: &SharedDir) -> anyhow::Result<()> {
+    match tokio::fs::metadata(&item.src).await {
+        Ok(meta) => {
+            let perm = meta.permissions().mode();
+            // since sandbox is executed as a `nobody`-like user,
+            // we are interested in three lowest bits
+            let access_for_others = perm & 0o7;
+            let desired_access = match item.kind {
+                SharedDirKind::Full => 0b111,
+                SharedDirKind::Readonly => 0b101,
+            };
+            if access_for_others & desired_access != desired_access {
+                anyhow::bail!(
+                    "Expected `others` access {}, but actually it is {}",
+                    desired_access,
+                    access_for_others
+                );
+            }
+            Ok(())
+        }
+
+        Err(err) => return Err(err).context("path it not accessible to invoker"),
+    }
+}
