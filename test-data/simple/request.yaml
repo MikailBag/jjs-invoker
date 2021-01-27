@@ -1,5 +1,5 @@
 inputs:
-  - fileId: test
+  - fileId: exec-stdin
     source:
       localFile:
         path: /test/input.txt
@@ -77,11 +77,6 @@ steps:
         id: exec-stderr
         readable: true
         writeable: true
-  - stage: 1
-    action:
-      openFile:
-        id: exec-stdin
-        path: /test/input.txt
   - stage: 1
     action:
       createSandbox:
