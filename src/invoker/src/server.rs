@@ -1,6 +1,35 @@
 use crate::{api::InvokeRequest, handler::Handler};
-use std::{convert::Infallible, sync::Arc};
+use anyhow::Context;
+use std::{convert::Infallible, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
 use warp::Filter;
+
+#[derive(Debug, Clone)]
+pub enum ListenAddress {
+    Tcp(SocketAddr),
+    Uds(PathBuf),
+}
+
+impl FromStr for ListenAddress {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> anyhow::Result<Self> {
+        let u = url::Url::parse(s).context("invalid url")?;
+        match u.scheme() {
+            "tcp" => {
+                let addr = u.host_str().context("listen address missing")?;
+                let ip = addr.parse().context("listen address is not IP")?;
+                let port = u.port().context("listen port missing")?;
+                let addr = SocketAddr::new(ip, port);
+                Ok(ListenAddress::Tcp(addr))
+            }
+            "unix" => {
+                let path = u.path().into();
+                Ok(ListenAddress::Uds(path))
+            }
+            other => anyhow::bail!("unknown scheme {}, expected one of 'tcp', 'unix'", other),
+        }
+    }
+}
 
 type Resp = hyper::Response<hyper::Body>;
 
@@ -49,7 +78,7 @@ impl Server {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn serve(self) -> anyhow::Result<()> {
+    pub async fn serve(self, addr: ListenAddress) -> anyhow::Result<()> {
         let handler = self.handler.clone();
         let r_exec = warp::path("exec")
             .and(warp::filters::body::json())
@@ -62,7 +91,18 @@ impl Server {
 
         let srv = r_exec.or(r_ready);
         let srv = warp::serve(srv);
-        srv.run(([0, 0, 0, 0], 8000)).await;
+        match addr {
+            ListenAddress::Tcp(addr) => {
+                srv.run(addr).await;
+            }
+            ListenAddress::Uds(path) => {
+                let listener = tokio::net::UnixListener::bind(&path)
+                    .with_context(|| format!("failed to attach to UDS {}", path.display()))?;
+                let listener = tokio_stream::wrappers::UnixListenerStream::new(listener);
+                srv.run_incoming(listener).await;
+            }
+        }
+
         Ok(())
     }
 }
