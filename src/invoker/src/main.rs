@@ -22,6 +22,11 @@ struct CliArgs {
     /// Directory to store intermediate files.
     #[clap(long)]
     work_dir: PathBuf,
+    /// Listen address.
+    /// Example for TCP: tcp://0.0.0.0:8000
+    /// Example for unix sockets: unix:/run/jjs-invoker.sock
+    #[clap(long)]
+    listen_address: server::ListenAddress,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -29,13 +34,13 @@ fn main() -> anyhow::Result<()> {
         .with_env_filter(EnvFilter::from_default_env())
         .init();
     let args: CliArgs = Clap::parse();
+    tracing::debug!(args = ?args);
     init::init()?;
     real_main(args)
 }
 
 #[tokio::main]
 async fn real_main(args: CliArgs) -> anyhow::Result<()> {
-    tracing::debug!(args = ?args);
     let handler_cfg = HandlerConfig {
         work_dir: args.work_dir,
     };
@@ -48,5 +53,5 @@ async fn real_main(args: CliArgs) -> anyhow::Result<()> {
         .await
         .context("failed to initialize handler")?;
     let server = server::Server::new(handler);
-    server.serve().await
+    server.serve(args.listen_address.clone()).await
 }
