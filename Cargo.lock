@@ -584,6 +584,7 @@ dependencies = [
  "minion",
  "nix 0.20.0",
  "once_cell",
+ "reqwest",
  "serde",
  "serde_json",
  "tokio",

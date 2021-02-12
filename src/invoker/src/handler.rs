@@ -59,7 +59,7 @@ impl Handler {
         tracing::info!(request = msg.as_str(), "processing InvokeRequest");
     }
 
-    #[tracing::instrument(skip(self, req))]
+    #[tracing::instrument(skip(self, req), fields(id = %req.id.to_hyphenated()))]
     pub async fn handle_invoke_request(
         &self,
         req: &InvokeRequest,

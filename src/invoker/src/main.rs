@@ -6,11 +6,13 @@ mod handler;
 mod init;
 mod print_invoke_request;
 mod server;
+mod shim;
 
 use anyhow::Context;
 use clap::Clap;
 use executor::SandboxGlobalSettings;
 use handler::{Handler, HandlerConfig};
+use shim::ShimClient;
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
@@ -27,6 +29,10 @@ struct CliArgs {
     /// Example for unix sockets: unix:/run/jjs-invoker.sock
     #[clap(long)]
     listen_address: server::ListenAddress,
+    /// Shim address.
+    /// For example, `https://127.0.0.1:8001`
+    #[clap(long)]
+    shim: Option<String>,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -52,6 +58,7 @@ async fn real_main(args: CliArgs) -> anyhow::Result<()> {
     let handler = Handler::new(handler_cfg, sandbox_cfg)
         .await
         .context("failed to initialize handler")?;
-    let server = server::Server::new(handler);
+    let shim = ShimClient::new(args.shim.as_deref()).context("failed to initialize shim client")?;
+    let server = server::Server::new(handler, shim);
     server.serve(args.listen_address.clone()).await
 }
