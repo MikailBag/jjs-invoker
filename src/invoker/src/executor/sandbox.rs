@@ -1,9 +1,10 @@
 use crate::api::{SandboxSettings, SharedDirectoryMode};
 use anyhow::Context as _;
-use minion::{SharedDir, SharedDirKind};
+use minion::{SharedItem, SharedItemKind};
 use std::{
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
+    sync::Arc,
     time::Duration,
 };
 use tokio::fs;
@@ -42,7 +43,7 @@ impl Drop for Tmpfs {
 }
 
 pub struct Sandbox {
-    sandbox: Box<dyn minion::erased::Sandbox>,
+    sandbox: Arc<dyn minion::erased::Sandbox>,
     // RAII owner
     _tmpfs: Tmpfs,
 }
@@ -53,7 +54,7 @@ pub struct SandboxGlobalSettings {
 }
 
 impl Sandbox {
-    pub fn raw_sandbox(&self) -> Box<dyn minion::erased::Sandbox> {
+    pub fn raw_sandbox(&self) -> Arc<dyn minion::erased::Sandbox> {
         self.sandbox.clone()
     }
 
@@ -63,7 +64,7 @@ impl Sandbox {
         settings: &SandboxSettings,
         global_settings: &SandboxGlobalSettings,
     ) -> anyhow::Result<Self> {
-        let mut shared_dirs = vec![];
+        let mut shared_items = vec![];
 
         if settings.base_image.as_path() == Path::new("/") {
             let dirs = global_settings
@@ -72,12 +73,13 @@ impl Sandbox {
                 .unwrap_or_else(|| &*DEFAULT_HOST_MOUNTS);
             for item in dirs {
                 let item = format!("/{}", item);
-                let shared_dir = minion::SharedDir {
+                let shared_item = minion::SharedItem {
+                    id: None,
                     src: item.clone().into(),
                     dest: item.into(),
-                    kind: minion::SharedDirKind::Readonly,
+                    kind: minion::SharedItemKind::Readonly,
                 };
-                shared_dirs.push(shared_dir)
+                shared_items.push(shared_item)
             }
         } else {
             let toolchain_dir = &settings.base_image;
@@ -86,26 +88,28 @@ impl Sandbox {
                 .context("failed to list toolchains sysroot")?;
             while let Some(item) = opt_items.next_entry().await? {
                 let name = item.file_name();
-                let shared_dir = minion::SharedDir {
+                let shared_item = minion::SharedItem {
+                    id: None,
                     src: toolchain_dir.join(&name),
                     dest: PathBuf::from(&name),
-                    kind: minion::SharedDirKind::Readonly,
+                    kind: minion::SharedItemKind::Readonly,
                 };
-                shared_dirs.push(shared_dir)
+                shared_items.push(shared_item)
             }
         }
 
         for item in &settings.expose {
             let kind = match item.mode {
-                SharedDirectoryMode::ReadOnly => minion::SharedDirKind::Readonly,
-                SharedDirectoryMode::ReadWrite => minion::SharedDirKind::Full,
+                SharedDirectoryMode::ReadOnly => minion::SharedItemKind::Readonly,
+                SharedDirectoryMode::ReadWrite => minion::SharedItemKind::Full,
             };
-            let shared_dir = minion::SharedDir {
+            let shared_item = minion::SharedItem {
+                id: None,
                 src: item.host_path.clone(),
                 dest: item.sandbox_path.clone(),
                 kind,
             };
-            shared_dirs.push(shared_dir);
+            shared_items.push(shared_item);
         }
 
         tokio::fs::create_dir_all(&sandbox_data_dir)
@@ -117,13 +121,14 @@ impl Sandbox {
         let t = Tmpfs::new(settings, &sandbox_work_dir)
             .context("failed to allocate sandbox working directory")?;
 
-        shared_dirs.push(minion::SharedDir {
+        shared_items.push(minion::SharedItem {
+            id: None,
             src: sandbox_work_dir,
             dest: settings.work_dir.clone(),
-            kind: minion::SharedDirKind::Full,
+            kind: minion::SharedItemKind::Full,
         });
 
-        for item in &shared_dirs {
+        for item in &shared_items {
             validate_shared_item(item).await;
         }
 
@@ -137,7 +142,7 @@ impl Sandbox {
         let sandbox_options = minion::SandboxOptions {
             max_alive_process_count: settings.limits.process_count as _,
             memory_limit: settings.limits.memory,
-            exposed_paths: shared_dirs,
+            shared_items,
             isolation_root: chroot_dir,
             cpu_time_limit,
             real_time_limit,
@@ -158,7 +163,7 @@ static DEFAULT_HOST_MOUNTS: once_cell::sync::Lazy<Vec<String>> = once_cell::sync
     ]
 });
 
-async fn validate_shared_item(item: &SharedDir) {
+async fn validate_shared_item(item: &SharedItem) {
     if let Err(e) = do_validate_shared_item(item).await {
         tracing::warn!(
             "Exposed path {} seems to be unusable: {:#}",
@@ -168,7 +173,7 @@ async fn validate_shared_item(item: &SharedDir) {
     }
 }
 
-async fn do_validate_shared_item(item: &SharedDir) -> anyhow::Result<()> {
+async fn do_validate_shared_item(item: &SharedItem) -> anyhow::Result<()> {
     match tokio::fs::metadata(&item.src).await {
         Ok(meta) => {
             let perm = meta.permissions().mode();
@@ -176,8 +181,8 @@ async fn do_validate_shared_item(item: &SharedDir) -> anyhow::Result<()> {
             // we are interested in three lowest bits
             let access_for_others = perm & 0o7;
             let desired_access = match item.kind {
-                SharedDirKind::Full => 0b111,
-                SharedDirKind::Readonly => 0b101,
+                SharedItemKind::Full => 0b111,
+                SharedItemKind::Readonly => 0b101,
             };
             if access_for_others & desired_access != desired_access {
                 anyhow::bail!(
