@@ -3,6 +3,11 @@
 # JJS Invoker
 This is component of [JJS Judging system](https://github.com/jjs-dev/jjs)
 
+## Building
+```bash
+bash build.sh
+```
+
 ## License
 Licensed under either of
 - [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)

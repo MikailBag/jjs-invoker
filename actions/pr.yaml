@@ -124,7 +124,7 @@ jobs:
           path: target
           key: ${{ runner.os }}-e2e-${{ steps.rustc_version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
       - name: Build invoker
-        run: docker build -f Dockerfile -t jjs-invoker .
+        run: bash build.sh
       - name: Run tests
         run: |
           mkdir /tmp/logs
