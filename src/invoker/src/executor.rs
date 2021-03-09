@@ -4,8 +4,10 @@ mod sandbox;
 pub use sandbox::SandboxGlobalSettings;
 
 use self::{file::File, sandbox::Sandbox};
-use crate::api::{Action, ActionResult, CommandResult, EnvVarValue, FileId, Input, InputSource};
 use anyhow::Context;
+use invoker_api::invoke::{
+    Action, ActionResult, CommandResult, EnvVarValue, FileId, Input, InputSource,
+};
 use minion::{
     erased::ChildProcessOptions, InputSpecification, OutputSpecification, StdioSpecification,
 };

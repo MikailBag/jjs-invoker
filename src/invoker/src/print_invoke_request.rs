@@ -1,7 +1,7 @@
 //! Implements pretty-printing of invocation request
 mod writer;
 
-use crate::api::{InputSource, InvokeRequest};
+use invoker_api::invoke::{InputSource, InvokeRequest};
 use writer::Writer;
 
 pub struct PrintWrapper<'a>(pub &'a InvokeRequest);

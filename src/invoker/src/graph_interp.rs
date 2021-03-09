@@ -1,7 +1,7 @@
 //! Interprets given request graph
 use std::{cmp::Ordering, fmt};
 
-use crate::api::{Action, InvokeRequest};
+use invoker_api::invoke::{Action, InvokeRequest};
 
 pub struct Interpreter<'a> {
     req: &'a InvokeRequest,

@@ -5,6 +5,7 @@ authors = ["Mikail Bagishov <bagishov.mikail@yandex.ru>"]
 edition = "2018"
 
 [dependencies]
+invoker-api = { path = "../invoker-api" }
 minion = { git = "https://github.com/jjs-dev/minion", rev = "52bae940" }
 tokio = { version = "1.2.0", features = ["macros", "io-std", "fs", "rt", "rt-multi-thread"] }
 anyhow = "1.0.38"
