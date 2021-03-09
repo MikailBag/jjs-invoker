@@ -1,10 +1,10 @@
 use crate::{
-    api::{InvokeRequest, InvokeResponse, Output},
     executor::{Executor, SandboxGlobalSettings},
     graph_interp::Interpreter,
     print_invoke_request::PrintWrapper,
 };
 use anyhow::Context as _;
+use invoker_api::invoke::{InvokeRequest, InvokeResponse, Output};
 use minion::{erased::Backend, linux::Settings};
 use std::path::PathBuf;
 

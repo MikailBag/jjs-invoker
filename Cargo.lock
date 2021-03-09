@@ -580,6 +580,7 @@ dependencies = [
  "clap",
  "futures-util",
  "hyper",
+ "invoker-api",
  "libc",
  "minion",
  "nix 0.20.0",
@@ -595,6 +596,14 @@ dependencies = [
  "url",
  "uuid",
  "warp",
+]
+
+[[package]]
+name = "invoker-api"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "uuid",
 ]
 
 [[package]]

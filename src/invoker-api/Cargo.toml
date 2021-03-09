@@ -1,0 +1,9 @@
+[package]
+name = "invoker-api"
+version = "0.1.0"
+authors = ["Mikail Bagishov <bagishov.mikail@yandex.ru>"]
+edition = "2018"
+
+[dependencies]
+serde = { version = "1.0.124", features = ["derive"] }
+uuid = "0.8.2"

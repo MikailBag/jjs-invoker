@@ -1,4 +1,3 @@
-mod api;
 mod config;
 mod executor;
 mod graph_interp;

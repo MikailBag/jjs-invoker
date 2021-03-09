@@ -1,5 +1,5 @@
-use crate::api::{SandboxSettings, SharedDirectoryMode};
 use anyhow::Context as _;
+use invoker_api::invoke::{SandboxSettings, SharedDirectoryMode};
 use minion::{SharedItem, SharedItemKind};
 use std::{
     os::unix::fs::PermissionsExt,

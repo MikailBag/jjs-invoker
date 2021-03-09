@@ -1,26 +1,25 @@
-//! Defines Invoker API.
-//! You can use invoker to securely execute untrusted programs.
+//! # Invocation API
+//! Requests invoker to execute commands, specified in
+//! `steps` field in request.
+//! ## Endpoints
+//! `POST /exec`
+//! ## Execution order
+//! Each step has assigned `stage`.
+//! Steps with equal stage will be executed in the same time.
+//! Such steps can share pipes. Sharing pipes between steps from
+//! different stages results in error. For each stage,
+//! steps creating new IPC stuff are executed first and then commands are run.
+//! Step will not be executed until all steps with less `stage`
+//! will be finished.
+//! ## Data
+//! `InvokeRequest` can specify input data items, that can be further used
+//! as stdin for executed commands (input data item can be used several times).
+//! ## DataRequest
+//! `InvokeRequest` can specify output data requests, which will be populated
+//! from some files, created by `CreateFile` action.
+
 use serde::{Deserialize, Serialize};
 use std::{fmt, path::PathBuf};
-
-/// Requests invoker to execute commands, specified in
-/// `steps` field in request.
-/// # Execution order
-/// Each step has assigned `stage`.
-/// Steps with equal stage will be executed in the same time.
-/// Such steps can share pipes. Sharing pipes between steps from
-/// different stages results in error. For each stage,
-/// steps creating new IPC stuff are executed first and then commands are run.
-/// Step will not be executed until all steps with less `stage`
-/// will be finished.
-/// # Data
-/// `InvokeRequest` can specify input data items, that can be further used
-/// as stdin for executed commands (input data item can be used several times).
-/// # DataRequest
-/// `InvokeRequest` can specify output data requests, which will be populated
-/// from some files, created by `CreateFile` action.
-#[allow(dead_code)]
-pub struct InvokeDocumentation(std::convert::Infallible);
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

@@ -6,4 +6,4 @@ debug = 1
 debug = 1
 
 [workspace]
-members=["src/invoker", "src/test-runner"]
+members=["src/invoker", "src/invoker-api", "src/test-runner"]
