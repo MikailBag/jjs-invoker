@@ -4,11 +4,9 @@ name: deploy
   push:
     branches:
       - master
+      - trying
       - fixup-deploy
 env:
-  CI: 1
-  RUST_BACKTRACE: full
-  RUSTC_BOOTSTRAP: 1
   DOCKER_BUILDKIT: 1
 jobs:
   docker:
@@ -17,6 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Build invoker
-        run: "docker build -t ghcr.io/jjs-dev/jjs-invoker:latest .\n"
+        run: "bash build.sh --release\n"
       - name: Upload images
-        run: "echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin\ndocker push ghcr.io/jjs-dev/jjs-invoker:latest\n"
+        run: "if [ \"$GITHUB_REF\" = \"refs/heads/master\" ] || [ \"$GITHUB_REF\" = \"refs/heads/fixup-deploy\" ]\nthen\n  TAG=\"latest\"\nelif [ \"$GITHUB_REF\" = \"refs/heads/trying\" ]\nthen\n  TAG=\"trying\"\nelse\n  echo \"unknown GITHUB_REF: $GITHUB_REF\"\n  exit 1\nfi\n\ndocker tag jjs-invoker ghcr.io/jjs-dev/jjs-invoker:$TAG\necho ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin\ndocker push ghcr.io/jjs-dev/jjs-invoker:$TAG\n"
