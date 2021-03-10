@@ -60,7 +60,6 @@ async fn route_exec_inner(
                 .expect("incorrect response"));
         }
     };
-    let req = serde_json::from_value(req).context("incorrect InvokeRequest")?;
 
     let response = handler.handle_invoke_request(&req).await?;
     let response = serde_json::to_vec(&response).context("failed to serialize InvokeResponse")?;
