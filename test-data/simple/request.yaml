@@ -1,8 +1,5 @@
-inputs:
-  - fileId: exec-stdin
-    source:
-      localFile:
-        path: /test/input.txt
+id: 97b68913-dae8-50dc-a71a-372072b944e4
+inputs: []
 steps:
   - stage: 0
     action:
@@ -39,13 +36,13 @@ steps:
     action:
       createSandbox:
         name: compile
-        baseImage: /base
+        baseImage: ''
         workDir: /jjs
         expose:
-          - hostPath: /test/prog.cpp
+          - hostPath: EXTRA_FILES/prog.cpp
             sandboxPath: /prog.cpp
             mode: readOnly
-          - hostPath: /tmp/
+          - hostPath: WORK
             sandboxPath: /out/
             mode: readWrite
         limits:
@@ -53,6 +50,11 @@ steps:
           time: 5000
           processCount: 16
           workDirSize: 32000000
+  - stage: 1
+    action:
+      openFile:
+        id: exec-stdin
+        path: EXTRA_FILES/input.txt
   - stage: 1
     action:
       executeCommand:
@@ -81,10 +83,10 @@ steps:
     action:
       createSandbox:
         name: exec
-        baseImage: /base
+        baseImage: ''
         workDir: /jjs
         expose:
-          - hostPath: /tmp/
+          - hostPath: WORK
             sandboxPath: /inp
             mode: readOnly
         limits:
@@ -93,15 +95,28 @@ steps:
           processCount: 16
           workDirSize: 32000000
 outputs:
-  - name: ''
+  - name: 'foo1'
     target:
       file: compile-stdout
-  - name: ''
+  - name: 'foo2'
     target:
       file: compile-stderr
-  - name: ''
+  - name: 'answer'
     target:
       file: exec-stdout
-  - name: ''
+  - name: 'foo3'
     target:
       file: exec-stderr
+ext:
+  extraFiles:
+    input.txt: "57 179"
+    prog.cpp: |
+      #include <iostream>
+
+      using namespace std;
+
+      int main() {
+         int a, b;
+         cin >> a >> b;
+         cout << a + b;
+      }

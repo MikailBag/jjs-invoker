@@ -6,4 +6,26 @@ debug = 1
 debug = 1
 
 [workspace]
-members=["src/invoker", "src/invoker-api", "src/test-runner"]
+members=["src/invoker", "src/invoker-api", "src/shim", "src/test-runner"]
+
+# Makes image pulls faster
+[profile.dev.package.libflate]
+opt-level=3
+
+[profile.dev.package.libflate_lz77]
+opt-level=3
+
+[profile.dev.package.adler32]
+opt-level=3
+
+[profile.dev.package.crc32fast]
+opt-level=3
+
+[profile.dev.package.rle-decode-fast]
+opt-level=3
+
+[profile.dev.package.tar]
+opt-level=3
+
+[profile.dev.package.dkregistry]
+opt-level=3

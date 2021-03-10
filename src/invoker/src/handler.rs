@@ -130,7 +130,7 @@ impl Handler {
                 let action_result = exec
                     .run_action(&req.steps[step_id].action)
                     .await
-                    .context("Step failed")?;
+                    .with_context(|| format!("Step {} failed", step_id))?;
                 tracing::info!(step_id = step_id, "Finished step");
                 poll_input.push(step_id);
                 response.actions.push(action_result);

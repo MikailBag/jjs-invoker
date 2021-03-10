@@ -15,7 +15,7 @@ use executor::SandboxGlobalSettings;
 use handler::{Handler, HandlerConfig};
 use shim::ShimClient;
 use std::path::PathBuf;
-use tracing_subscriber::EnvFilter;
+use tracing_subscriber::{filter::EnvFilter, fmt::format::FmtSpan};
 
 #[derive(Clap, Debug)]
 struct CliArgs {
@@ -47,6 +47,7 @@ struct CliArgs {
 fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
+        .with_span_events(FmtSpan::CLOSE)
         .init();
     let args: CliArgs = Clap::parse();
     tracing::debug!(args = ?args);
