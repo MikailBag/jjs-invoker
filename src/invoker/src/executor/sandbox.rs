@@ -78,6 +78,7 @@ impl Sandbox {
                     src: item.clone().into(),
                     dest: item.into(),
                     kind: minion::SharedItemKind::Readonly,
+                    flags: Vec::new(),
                 };
                 shared_items.push(shared_item)
             }
@@ -93,6 +94,7 @@ impl Sandbox {
                     src: toolchain_dir.join(&name),
                     dest: PathBuf::from(&name),
                     kind: minion::SharedItemKind::Readonly,
+                    flags: Vec::new(),
                 };
                 shared_items.push(shared_item)
             }
@@ -108,6 +110,7 @@ impl Sandbox {
                 src: item.host_path.clone(),
                 dest: item.sandbox_path.clone(),
                 kind,
+                flags: Vec::new(),
             };
             shared_items.push(shared_item);
         }
@@ -126,6 +129,7 @@ impl Sandbox {
             src: sandbox_work_dir,
             dest: settings.work_dir.clone(),
             kind: minion::SharedItemKind::Full,
+            flags: Vec::new(),
         });
 
         for item in &shared_items {
