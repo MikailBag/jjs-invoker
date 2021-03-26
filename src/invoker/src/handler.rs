@@ -30,7 +30,7 @@ fn check_system(settings: &Settings) -> anyhow::Result<()> {
 
 fn setup_minion(skip_checks: bool) -> anyhow::Result<Box<dyn Backend>> {
     let mut settings = Settings::new();
-    settings.cgroup_prefix = "/jjs".into();
+    settings.cgroup.name_prefix = "/jjs".into();
     if !skip_checks {
         check_system(&settings).context("system configuration problem detected")?;
     }
