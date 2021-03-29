@@ -1,5 +1,8 @@
+mod env;
+
 use anyhow::Context;
 use clap::Clap;
+use env::Env;
 use rand::Rng;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
@@ -49,72 +52,50 @@ fn main() -> anyhow::Result<()> {
             .context("test case name is not utf-8")?
             .to_string();
         println!("--- Running test {} ---", name);
-        let (base_dir_path, image_tag) =
-            prepare_base_image(&name, &item.path(), Path::new("/tmp"))?;
-        println!("Starting container");
-        let container_name = randomize(&format!("jjs-invoker-test-suite-{}", name));
+        let (base_dir, image_tag) = prepare_base_image(&name, &item.path(), Path::new("/tmp"))?;
+        println!("Starting environment");
         let work_dir_path = logs_dir.join(&name);
-        let test_files = item
-            .path()
-            .join("files")
-            .canonicalize()
-            .context("failed to canonicalize ./files dir")?;
+
         std::fs::create_dir_all(&work_dir_path)?;
-        xshell::cmd!(
-            "docker create 
-            --publish-all 
-            --name {container_name}
-            --mount type=bind,ro=true,src={base_dir_path},dst=/base
-            --mount type=bind,src={work_dir_path},dst=/var/judges
-            --mount type=bind,src={test_files},dst=/test
-            --memory 2g
-            --env RUST_BACKTRACE=1
-            --env RUST_LOG=info,invoker=trace
-            --privileged
-            {invoker_image}"
-        )
-        .run()?;
-        xshell::cmd!("docker start {container_name}").run().ok();
+        let env_name = randomize(&format!("jjs-invoker-test-suite-{}", name));
+        let e = Env::new(
+            &env_name,
+            &work_dir_path,
+            invoker_image,
+            &item.path(),
+            &base_dir,
+        )?;
+
+        e.start()?;
         println!("Waiting for container readiness");
         {
             let mut ready = false;
             for _ in 0..10 {
-                let description = docker_describe(&container_name)?;
-                let health_status = description
-                    .pointer("/0/State/Health/Status")
-                    .and_then(|val| val.as_str());
-                println!("Health status: {:?}", health_status);
-                if health_status == Some("healthy") {
+                let health = e.health()?;
+                println!("Health status: {:?}", health);
+                if health.iter().all(|h| *h == "healthy") {
                     ready = true;
                     break;
                 }
-                std::thread::sleep(std::time::Duration::from_millis(2500));
+                std::thread::sleep(std::time::Duration::from_millis(3000));
             }
             if !ready {
+                e.logs()?;
                 anyhow::bail!("readiness wait timed out");
             }
         }
-        let port = {
-            let description = docker_describe(&container_name)?;
-            let port_jsonpath = "/0/NetworkSettings/Ports/8000~1tcp/0/HostPort";
-            let port = description.pointer(port_jsonpath).with_context(|| {
-                format!("{} path missing in container description", port_jsonpath)
-            })?;
-            port.as_str()
-                .context("port is not string")?
-                .parse()
-                .context("invalid HostPort value")?
-        };
         if args.wait_before_test {
             wait();
         }
+        let port = e.invoker_port()?;
         let res = run_test(&name, &item.path(), port, &image_tag);
         if !args.retain_containers {
-            xshell::cmd!("docker kill {container_name}").run().ok();
+            e.kill()?;
         }
-        xshell::cmd!("docker logs {container_name}").run().ok();
-        if !args.retain_containers {
-            xshell::cmd!("docker rm {container_name}").run()?;
+        e.logs()?;
+        if args.retain_containers {
+            println!("Leaking docker resources as requested");
+            std::mem::forget(e);
         }
         if let Some(err) = res.err() {
             return Err(err).with_context(|| format!("test {} failed", name));
@@ -133,7 +114,7 @@ fn prepare_base_image(
     let image_tag = format!("jjs-invoker-tests-base-image-{}", test_name);
     xshell::cmd!("docker build -t {image_tag} {test_case}").run()?;
     let image_hash = {
-        let description = docker_describe(&image_tag)?;
+        let description = describe_docker_image(&image_tag)?;
         let path = "/0/Id";
         let image = description
             .pointer(path)
@@ -183,7 +164,7 @@ fn run_test(test_name: &str, test_case: &Path, port: u16, image_tag: &str) -> an
     let mut request_body: serde_json::Value =
         serde_yaml::from_slice(&request_body).context("invalid request")?;
     let img_envs = {
-        let description = docker_describe(image_tag)?;
+        let description = describe_docker_image(image_tag)?;
         let env_items = description
             .pointer("/0/Config/Env")
             .context("Env missing in image config")?
@@ -288,10 +269,10 @@ fn export_response(
     Ok(())
 }
 
-fn docker_describe(name: &str) -> anyhow::Result<serde_json::Value> {
-    let description = xshell::cmd!("docker inspect {name}")
+fn describe_docker_image(image: &str) -> anyhow::Result<serde_json::Value> {
+    let description = xshell::cmd!("docker inspect {image}")
         .read()
-        .context("failed to describe container")?;
+        .context("failed to describe image")?;
     let description = description.trim();
     serde_json::from_str(description).context("failed to parse inspect output")
 }
