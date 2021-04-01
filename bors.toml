@@ -3,7 +3,7 @@ status = [
 'clippy',
 'unit-tests',
 'udeps',
-'e2e'
+'e2e-run'
 ]
 delete-merged-branches = true
 timeout-sec = 900

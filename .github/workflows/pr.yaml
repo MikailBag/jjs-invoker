@@ -113,8 +113,8 @@ jobs:
           key: "${{ runner.os }}-udeps-${{ steps.rustc_version.outputs.version }}-${{ hashFiles('Cargo.lock') }}"
       - name: cargo-udeps
         run: "export PATH=~/udeps:$PATH\ncargo udeps\n"
-  e2e:
-    name: e2e
+  e2e-build:
+    name: e2e-build
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
@@ -134,10 +134,42 @@ jobs:
       - name: Cache build dir
         uses: actions/cache@v2
         with:
-          path: target
+          path: "~/.cargo/registry\n~/.cargo/git\ntarget\n"
           key: "${{ runner.os }}-e2e-${{ steps.rustc_version.outputs.version }}-${{ hashFiles('Cargo.lock') }}"
-      - name: Build invoker
+      - name: Build images
         run: bash build.sh
+      - name: Export images
+        run: "mkdir images\nskopeo copy docker-daemon:jjs-invoker:latest dir:images/invoker\n"
+      - name: Upload images
+        uses: actions/upload-artifact@v2
+        with:
+          name: e2e-images
+          path: images
+          retention-days: 2
+  e2e-run:
+    name: e2e-run
+    needs: e2e-build
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install system dependencies
+        run: sudo apt-get install -y libssl-dev cmake
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: "clippy,rustfmt"
+          override: true
+      - name: Get Rust version
+        id: rustc_version
+        run: "rust_version=$(rustc --version | md5sum | cut -f 1-1 -d ' ')\necho \"##[set-output name=version;]$(echo $rust_version)\"\n"
+      - name: Download images
+        uses: actions/download-artifact@v2
+        with:
+          name: e2e-images
+          path: images
+      - name: Import images
+        run: "skopeo copy dir:images/invoker docker-daemon:jjs-invoker:latest\n"
       - name: Run tests
         run: "mkdir /tmp/logs\ncargo run -p test-runner -- --image=jjs-invoker --logs=/tmp/logs\n"
       - name: Upload logs
@@ -146,3 +178,4 @@ jobs:
         with:
           name: invoker-logs
           path: /tmp/logs
+          retention-days: 2
