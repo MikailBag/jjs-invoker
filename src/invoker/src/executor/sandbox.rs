@@ -51,6 +51,7 @@ pub struct Sandbox {
 pub struct SandboxGlobalSettings {
     pub exposed_host_items: Option<Vec<String>>,
     pub skip_system_checks: bool,
+    pub override_id_range: Option<(u32, u32)>,
 }
 
 impl Sandbox {

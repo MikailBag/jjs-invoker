@@ -28,9 +28,15 @@ fn check_system(settings: &Settings) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn setup_minion(skip_checks: bool) -> anyhow::Result<Box<dyn Backend>> {
+fn setup_minion(
+    skip_checks: bool,
+    id_range: Option<(u32, u32)>,
+) -> anyhow::Result<Box<dyn Backend>> {
     let mut settings = Settings::new();
     settings.cgroup.name_prefix = "/jjs".into();
+    if let Some((low, high)) = id_range {
+        settings.uid = minion::linux::UserIdBounds { low, high };
+    }
     if !skip_checks {
         check_system(&settings).context("system configuration problem detected")?;
     }
@@ -43,8 +49,11 @@ impl Handler {
         config: HandlerConfig,
         sandbox_global_settings: SandboxGlobalSettings,
     ) -> anyhow::Result<Self> {
-        let backend = setup_minion(sandbox_global_settings.skip_system_checks)
-            .context("failed to initialize minion backend")?;
+        let backend = setup_minion(
+            sandbox_global_settings.skip_system_checks,
+            sandbox_global_settings.override_id_range,
+        )
+        .context("failed to initialize minion backend")?;
 
         Ok(Handler {
             cfg: config,
