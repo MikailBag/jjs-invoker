@@ -1,3 +1,4 @@
+mod cli_args;
 mod config;
 mod executor;
 mod graph_interp;
@@ -9,6 +10,7 @@ mod shim;
 
 use anyhow::Context;
 use clap::Clap;
+use cli_args::IdRange;
 use executor::SandboxGlobalSettings;
 use handler::{Handler, HandlerConfig};
 use shim::ShimClient;
@@ -32,6 +34,14 @@ struct CliArgs {
     /// For example, `https://127.0.0.1:8001`
     #[clap(long)]
     shim: Option<String>,
+    /// User and group id range
+    /// When invoker runs as root, it will assign identifiers from this range
+    /// to the sandboxes.
+    ///
+    /// Must be specified as `LOW:HIGH`, where LOW < HIGH, and range [LOW, HIGH)
+    /// will be used.
+    #[clap(long)]
+    sandbox_id_range: Option<IdRange>,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -53,6 +63,7 @@ async fn real_main(args: CliArgs) -> anyhow::Result<()> {
         // TODO: add CLI arg
         exposed_host_items: None,
         skip_system_checks: args.skip_checks,
+        override_id_range: args.sandbox_id_range.as_ref().map(|r| (r.low, r.high)),
     };
     let handler = Handler::new(handler_cfg, sandbox_cfg)
         .await
