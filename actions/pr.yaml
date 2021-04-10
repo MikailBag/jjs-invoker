@@ -81,11 +81,11 @@ jobs:
         uses: actions/cache@v1.1.0
         with:
           path: ~/udeps
-          key: ${{ runner.os }}-udeps-bin-${{ steps.rustc_version.outputs.version }}-v0.1.16
+          key: ${{ runner.os }}-udeps-bin-${{ steps.rustc_version.outputs.version }}-v0.1.2o
       - name: Install cargo-udeps
         if: steps.cache_udeps.outputs.cache-hit != 'true'
         run: |
-          cargo install cargo-udeps --locked --version 0.1.16
+          cargo install cargo-udeps --locked --version 0.1.20
           mkdir -p ~/udeps
           cp $( which cargo-udeps ) ~/udeps
       - name: Cache build dir
