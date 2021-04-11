@@ -1,4 +1,0 @@
-persistence:
-  enabled: false
-auth:
-  enabled: false

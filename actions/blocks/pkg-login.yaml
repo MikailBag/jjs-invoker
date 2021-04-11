@@ -1,3 +1,0 @@
-name: Log into Github Package Registry
-run: |
-  echo "${{ secrets.GITHUB_TOKEN }}" | docker login docker.pkg.github.com -u jjs-dev --password-stdin
