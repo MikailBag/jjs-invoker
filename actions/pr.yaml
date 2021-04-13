@@ -127,10 +127,11 @@ jobs:
             target
           key: ${{ runner.os }}-e2e-${{ steps.rustc_version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
       - name: Build images
-        run: bash build.sh
+        run: bash build.sh -p test-runner
       - name: Export images
         run: |
           mkdir images
+          cp ./out/test-runner images/test-runner
           skopeo copy docker-daemon:jjs-invoker:latest dir:images/invoker
       - name: Upload images
         uses: actions/upload-artifact@v2
@@ -144,8 +145,6 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - $include: sysdeps
-      - $include: rustc
       - name: Get Rust version
         id: rustc_version
         run: |
@@ -162,7 +161,8 @@ jobs:
       - name: Run tests
         run: |
           mkdir /tmp/logs
-          cargo run -p test-runner -- --image=jjs-invoker --logs=/tmp/logs
+          chmod +x ./images/test-runner
+          ./images/test-runner --image=jjs-invoker --logs=/tmp/logs
       - name: Upload logs
         if: failure()
         uses: actions/upload-artifact@v2

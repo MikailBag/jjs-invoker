@@ -70,7 +70,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: Install system dependencies
-        run: sudo apt-get install -y libssl-dev cmake
+        run: sudo apt-get install -y libssl-dev
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -87,7 +87,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: Install system dependencies
-        run: sudo apt-get install -y libssl-dev cmake
+        run: sudo apt-get install -y libssl-dev
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -102,10 +102,10 @@ jobs:
         uses: actions/cache@v1.1.0
         with:
           path: ~/udeps
-          key: "${{ runner.os }}-udeps-bin-${{ steps.rustc_version.outputs.version }}-v0.1.16"
+          key: "${{ runner.os }}-udeps-bin-${{ steps.rustc_version.outputs.version }}-v0.1.2o"
       - name: Install cargo-udeps
         if: "steps.cache_udeps.outputs.cache-hit != 'true'"
-        run: "cargo install cargo-udeps --locked --version 0.1.16\nmkdir -p ~/udeps\ncp $( which cargo-udeps ) ~/udeps\n"
+        run: "cargo install cargo-udeps --locked --version 0.1.20\nmkdir -p ~/udeps\ncp $( which cargo-udeps ) ~/udeps\n"
       - name: Cache build dir
         uses: actions/cache@v1.1.0
         with:
@@ -119,7 +119,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install system dependencies
-        run: sudo apt-get install -y libssl-dev cmake
+        run: sudo apt-get install -y libssl-dev
       - name: Install latest docker
         run: "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -\nsudo add-apt-repository \\\n  \"deb [arch=amd64] https://download.docker.com/linux/ubuntu \\\n  $(lsb_release -cs) \\\n  stable\"\nsudo apt-get update\nsudo apt-get install -y docker-ce docker-ce-cli containerd.io\n"
       - name: Install Rust toolchain
@@ -137,9 +137,9 @@ jobs:
           path: "~/.cargo/registry\n~/.cargo/git\ntarget\n"
           key: "${{ runner.os }}-e2e-${{ steps.rustc_version.outputs.version }}-${{ hashFiles('Cargo.lock') }}"
       - name: Build images
-        run: bash build.sh
+        run: bash build.sh -p test-runner
       - name: Export images
-        run: "mkdir images\nskopeo copy docker-daemon:jjs-invoker:latest dir:images/invoker\n"
+        run: "mkdir images\ncp ./out/test-runner images/test-runner\nskopeo copy docker-daemon:jjs-invoker:latest dir:images/invoker\n"
       - name: Upload images
         uses: actions/upload-artifact@v2
         with:
@@ -152,14 +152,6 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - name: Install system dependencies
-        run: sudo apt-get install -y libssl-dev cmake
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          components: "clippy,rustfmt"
-          override: true
       - name: Get Rust version
         id: rustc_version
         run: "rust_version=$(rustc --version | md5sum | cut -f 1-1 -d ' ')\necho \"##[set-output name=version;]$(echo $rust_version)\"\n"
@@ -171,7 +163,7 @@ jobs:
       - name: Import images
         run: "skopeo copy dir:images/invoker docker-daemon:jjs-invoker:latest\n"
       - name: Run tests
-        run: "mkdir /tmp/logs\ncargo run -p test-runner -- --image=jjs-invoker --logs=/tmp/logs\n"
+        run: "mkdir /tmp/logs\nchmod +x ./images/test-runner\n./images/test-runner --image=jjs-invoker --logs=/tmp/logs\n"
       - name: Upload logs
         if: failure()
         uses: actions/upload-artifact@v2
