@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 invoker-api = { path = "../invoker-api" }
-minion = { git = "https://github.com/jjs-dev/minion", rev = "52e7b4fb" }
+minion = { git = "https://github.com/jjs-dev/minion", rev = "337acd8e" }
 tokio = { version = "1.2.0", features = ["macros", "io-std", "fs", "rt", "rt-multi-thread"] }
 anyhow = "1.0.38"
 futures-util = "0.3.13"

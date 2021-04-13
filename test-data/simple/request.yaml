@@ -93,7 +93,15 @@ steps:
           processCount: 16
           workDirSize: 32000000
 outputs:
-  - fileId: compile-stdout
-  - fileId: compile-stderr
-  - fileId: exec-stdout
-  - fileId: exec-stderr
+  - name: ''
+    target:
+      file: compile-stdout
+  - name: ''
+    target:
+      file: compile-stderr
+  - name: ''
+    target:
+      file: exec-stdout
+  - name: ''
+    target:
+      file: exec-stderr
