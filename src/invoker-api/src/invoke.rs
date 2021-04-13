@@ -17,11 +17,14 @@
 //! ## DataRequest
 //! `InvokeRequest` can specify output data requests, which will be populated
 //! from some files, created by `CreateFile` action.
+//! ## Extensions
+//! You can specify extensions at different levels of the InvokeRequest obkect.
+//! This extensions must be consumed and stripped by the shim.
 
 use serde::{Deserialize, Serialize};
 use std::{fmt, path::PathBuf};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 pub struct InvokeRequest {
@@ -34,6 +37,8 @@ pub struct InvokeRequest {
     /// Request identifier.
     /// Will be returned as-is in response.
     pub id: uuid::Uuid,
+    #[serde(default)]
+    pub ext: Extensions,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -42,21 +47,35 @@ pub struct InvokeRequest {
 pub struct InvokeResponse {
     /// Request identifier as specified in request.
     pub id: uuid::Uuid,
-    /// Outputs for all OutputRequest
+    /// Outputs for all OutputRequest (the same order as in request).
     pub outputs: Vec<Output>,
     /// Results of all actions
     pub actions: Vec<ActionResult>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 pub struct OutputRequest {
-    /// File id that should be exported
-    pub file_id: FileId,
+    /// Request name (will be preserved)
+    pub name: String,
+    /// Specifies what exactly should be exported
+    pub target: OutputRequestTarget,
+    #[serde(default)]
+    pub ext: Extensions,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub enum OutputRequestTarget {
+    /// File id that should be exported
+    File(FileId),
+    /// Export local file by path
+    Path(PathBuf),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 pub struct Input {
@@ -64,9 +83,11 @@ pub struct Input {
     pub file_id: FileId,
     /// Data source
     pub source: InputSource,
+    #[serde(default)]
+    pub ext: Extensions,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 pub enum InputSource {
@@ -79,17 +100,29 @@ pub enum InputSource {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
-pub enum Output {
-    /// Base64-encoded data
-    InlineBase64(String),
+pub struct Output {
+    /// Output name (as specified in OutputRequest)
+    pub name: String,
+    /// Data itself
+    pub data: OutputData,
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
+pub enum OutputData {
+    /// Base64-encoded data
+    InlineBase64(String),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
 pub struct Step {
     pub stage: u32,
     pub action: Action,
+    #[serde(default)]
+    pub ext: Extensions,
 }
 
 /// Newtype identifier of file-like object, e.g. real file or pipe.
@@ -114,6 +147,8 @@ pub struct Command {
     pub env: Vec<EnvironmentVariable>,
     pub cwd: String,
     pub stdio: Stdio,
+    #[serde(default)]
+    pub ext: Extensions,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -122,6 +157,8 @@ pub struct Command {
 pub struct EnvironmentVariable {
     pub name: String,
     pub value: EnvVarValue,
+    #[serde(default)]
+    pub ext: Extensions,
 }
 
 /// Allowed access to shared directory
@@ -146,6 +183,8 @@ pub struct SharedDir {
     pub sandbox_path: PathBuf,
     /// Access mode
     pub mode: SharedDirectoryMode,
+    #[serde(default)]
+    pub ext: Extensions,
 }
 
 /// Value of the environment variable
@@ -167,6 +206,8 @@ pub struct Stdio {
     pub stdin: FileId,
     pub stdout: FileId,
     pub stderr: FileId,
+    #[serde(default)]
+    pub ext: Extensions,
 }
 
 /// Describer limits that should be applied to a sandbox.
@@ -178,10 +219,13 @@ pub struct Limits {
     pub memory: u64,
     /// Time limit in milliseconds
     pub time: u64,
-    /// Process count limit
-    pub process_count: u64,
+    /// Process count limit.
+    #[serde(default)]
+    pub process_count: Option<u64>,
     /// Working dir size limit in bytes
-    pub work_dir_size: u64,
+    pub work_dir_size: Option<u64>,
+    #[serde(default)]
+    pub ext: Extensions,
 }
 
 /// Sandbox settings
@@ -204,6 +248,8 @@ pub struct SandboxSettings {
     /// Initially it will be empty, and it will be readable and writable
     /// by all sandboxed processes.
     pub work_dir: PathBuf,
+    #[serde(default)]
+    pub ext: Extensions,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -234,7 +280,7 @@ pub struct CommandResult {
 }
 
 /// Single action of execution plan.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 pub enum Action {
@@ -273,3 +319,8 @@ pub enum Action {
     /// Specifies that sandbox should be created
     CreateSandbox(SandboxSettings),
 }
+
+/// Arbitrary key-value data (i.e. json Object), consumed by the shim.
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(transparent)]
+pub struct Extensions(pub serde_json::Map<String, serde_json::Value>);

@@ -15,11 +15,14 @@ struct Tmpfs {
     path: PathBuf,
 }
 
+// 16 MiB
+const DEFAULT_WORK_DIR_SIZE_LIMIT: u64 = 1 << 24;
+
 impl Tmpfs {
     #[cfg(target_os = "linux")]
     fn new(settings: &SandboxSettings, path: &Path) -> anyhow::Result<Self> {
         let quota = settings.limits.work_dir_size;
-        let quota = minion::linux::ext::Quota::bytes(quota);
+        let quota = minion::linux::ext::Quota::bytes(quota.unwrap_or(DEFAULT_WORK_DIR_SIZE_LIMIT));
         minion::linux::ext::make_tmpfs(path, quota)
             .context("failed to set size limit on shared directory")?;
         Ok(Tmpfs {
@@ -54,6 +57,9 @@ pub struct SandboxGlobalSettings {
     pub override_id_range: Option<(u32, u32)>,
 }
 
+// TODO: relax when using cgroups
+const DEFAULT_PROCESS_COUNT: u64 = 1;
+
 impl Sandbox {
     pub fn raw_sandbox(&self) -> Arc<dyn minion::erased::Sandbox> {
         self.sandbox.clone()
@@ -85,9 +91,12 @@ impl Sandbox {
             }
         } else {
             let toolchain_dir = &settings.base_image;
-            let mut opt_items = fs::read_dir(toolchain_dir)
-                .await
-                .context("failed to list toolchains sysroot")?;
+            let mut opt_items = fs::read_dir(toolchain_dir).await.with_context(|| {
+                format!(
+                    "failed to list toolchain image directory ({})",
+                    toolchain_dir.display()
+                )
+            })?;
             while let Some(item) = opt_items.next_entry().await? {
                 let name = item.file_name();
                 let shared_item = minion::SharedItem {
@@ -145,16 +154,20 @@ impl Sandbox {
             .with_context(|| format!("failed to create chroot dir {}", chroot_dir.display()))?;
         // TODO adjust integer types
         let sandbox_options = minion::SandboxOptions {
-            max_alive_process_count: settings.limits.process_count as _,
+            max_alive_process_count: settings
+                .limits
+                .process_count
+                .unwrap_or(DEFAULT_PROCESS_COUNT) as _,
             memory_limit: settings.limits.memory,
             shared_items,
             isolation_root: chroot_dir,
             cpu_time_limit,
             real_time_limit,
         };
+        tracing::debug!(options = ?sandbox_options, "Creating minion sandbox");
         let sandbox = backend
             .new_sandbox(sandbox_options)
-            .context("failed to create minion dominion")?;
+            .context("failed to create minion sandbox")?;
         Ok(Sandbox { sandbox, _tmpfs: t })
     }
 }

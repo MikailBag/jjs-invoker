@@ -252,6 +252,21 @@ fn run_test(test_name: &str, test_case: &Path, port: u16, image_tag: &str) -> an
     Ok(())
 }
 
+fn get_output_name(req: &serde_json::Value) -> Option<String> {
+    let req = req.as_object()?;
+    if req.contains_key("file") {
+        return Some(format!(
+            "file-{}",
+            req["file"].as_str().unwrap().to_string()
+        ));
+    }
+    if req.contains_key("path") {
+        let path = req["path"].as_str().unwrap().to_string().replace('/', "_");
+        return Some(format!("path-{}", path));
+    }
+    None
+}
+
 fn export_response(
     req: &serde_json::Value,
     res: &serde_json::Value,
@@ -261,8 +276,19 @@ fn export_response(
     let response_outputs = res.pointer("/outputs").unwrap().as_array().unwrap();
     assert_eq!(request_outputs.len(), response_outputs.len());
     for (req_out, res_out) in request_outputs.iter().zip(response_outputs.iter()) {
-        let output_name = req_out.pointer("/fileId").unwrap().as_str().unwrap();
-        let output_value = res_out.pointer("/inlineBase64").unwrap().as_str().unwrap();
+        let output_name = get_output_name(&req_out["target"]).unwrap_or_else(|| {
+            panic!(
+                "failed to infer output name for outputRequest {:#?}",
+                req_out
+            )
+        });
+        println!("Exporting output {}", output_name);
+        let output_value = res_out
+            .pointer("/data/inlineBase64")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
         let output_value = base64::decode(output_value).context("invalid base64")?;
         std::fs::write(path.join(output_name), output_value)?;
     }

@@ -748,7 +748,7 @@ dependencies = [
 [[package]]
 name = "minion"
 version = "0.1.0"
-source = "git+https://github.com/jjs-dev/minion?rev=52e7b4fb#52e7b4fbeb8e1f3f47dcd7e9e2786cf315ea89cf"
+source = "git+https://github.com/jjs-dev/minion?rev=337acd8e#337acd8eebdbae29967b0a997c98b296ed90783b"
 dependencies = [
  "anyhow",
  "backtrace",

@@ -4,7 +4,7 @@ use crate::{
     print_invoke_request::PrintWrapper,
 };
 use anyhow::Context as _;
-use invoker_api::invoke::{InvokeRequest, InvokeResponse, Output};
+use invoker_api::invoke::{InvokeRequest, InvokeResponse, Output, OutputData, OutputRequestTarget};
 use minion::{erased::Backend, linux::Settings};
 use std::path::PathBuf;
 
@@ -66,6 +66,23 @@ impl Handler {
         let wrapper = PrintWrapper(req);
         let msg = wrapper.print();
         tracing::info!(request = msg.as_str(), "processing InvokeRequest");
+        tracing::trace!(request = ?req, "processing InvokeRequest");
+    }
+
+    async fn get_output(
+        &self,
+        exec: &mut Executor<'_>,
+        output_req: &OutputRequestTarget,
+    ) -> anyhow::Result<Vec<u8>> {
+        match output_req {
+            OutputRequestTarget::File(file_id) => exec
+                .export(&file_id)
+                .await
+                .with_context(|| format!("failed to export file_id {}", file_id)),
+            OutputRequestTarget::Path(path) => tokio::fs::read(&path)
+                .await
+                .with_context(|| format!("failed to export path {}", path.display())),
+        }
     }
 
     #[tracing::instrument(skip(self, req), fields(id = %req.id.to_hyphenated()))]
@@ -125,14 +142,17 @@ impl Handler {
         tracing::info!("Collecting outputs");
 
         for (pos, output_req) in req.outputs.iter().enumerate() {
-            let data = exec
-                .export(&output_req.file_id)
+            let data = self
+                .get_output(&mut exec, &output_req.target)
                 .await
-                .with_context(|| format!("failed to export #{}", pos))?;
+                .with_context(|| format!("Failed to get output #{}", pos))?;
             tracing::debug!(output_id = pos, byte_count = data.len());
             let data = base64::encode(&data);
 
-            response.outputs.push(Output::InlineBase64(data));
+            response.outputs.push(Output {
+                name: output_req.name.clone(),
+                data: OutputData::InlineBase64(data),
+            });
         }
         Ok(response)
     }
