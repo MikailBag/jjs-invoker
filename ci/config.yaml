@@ -1,0 +1,3 @@
+dockerImages:
+  - jjs-invoker
+buildTimeoutMinutes: 15
