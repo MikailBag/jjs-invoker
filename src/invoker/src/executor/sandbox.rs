@@ -115,6 +115,29 @@ impl Sandbox {
                 SharedDirectoryMode::ReadOnly => minion::SharedItemKind::Readonly,
                 SharedDirectoryMode::ReadWrite => minion::SharedItemKind::Full,
             };
+            if item.create {
+                tokio::fs::create_dir_all(&item.host_path).await?;
+            }
+            // TODO: is this best way?
+            {
+                let current_mode = tokio::fs::metadata(&item.host_path)
+                    .await?
+                    .permissions()
+                    .mode();
+                if let SharedDirectoryMode::ReadWrite = item.mode {
+                    // copies access for owner to access for group and others
+                    let our_access = (current_mode >> 6) & 0b111;
+                    let mode = (current_mode >> 9 << 9) | (our_access * ((1 << 6) + (1 << 3) + 1));
+                    let perms = PermissionsExt::from_mode(mode);
+                    tracing::debug!(
+                        "changing permissions for {} from {:o} to {:o}",
+                        item.host_path.display(),
+                        current_mode,
+                        mode
+                    );
+                    tokio::fs::set_permissions(&item.host_path, perms).await?;
+                }
+            }
             let shared_item = minion::SharedItem {
                 id: None,
                 src: item.host_path.clone(),

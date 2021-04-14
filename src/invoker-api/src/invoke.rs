@@ -21,7 +21,7 @@
 //! You can specify extensions at different levels of the InvokeRequest obkect.
 //! This extensions must be consumed and stripped by the shim.
 
-use serde::{Deserialize, Serialize};
+use serde::{ser::Error as _, Deserialize, Serialize};
 use std::{fmt, path::PathBuf};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -183,6 +183,9 @@ pub struct SharedDir {
     pub sandbox_path: PathBuf,
     /// Access mode
     pub mode: SharedDirectoryMode,
+    /// If true and hostPath does not exist, it will be created.
+    #[serde(default)]
+    pub create: bool,
     #[serde(default)]
     pub ext: Extensions,
 }
@@ -223,6 +226,7 @@ pub struct Limits {
     #[serde(default)]
     pub process_count: Option<u64>,
     /// Working dir size limit in bytes
+    #[serde(default)]
     pub work_dir_size: Option<u64>,
     #[serde(default)]
     pub ext: Extensions,
@@ -324,3 +328,15 @@ pub enum Action {
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(transparent)]
 pub struct Extensions(pub serde_json::Map<String, serde_json::Value>);
+
+impl Extensions {
+    pub fn make<T: Serialize>(value: T) -> Result<Self, serde_json::Error> {
+        let value = serde_json::to_value(value)?;
+        if let serde_json::Value::Object(m) = value {
+            return Ok(Extensions(m));
+        }
+        Err(serde_json::Error::custom(
+            "Extensions can only hold JSON object",
+        ))
+    }
+}

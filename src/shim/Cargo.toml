@@ -1,0 +1,25 @@
+[package]
+name = "shim"
+version = "0.1.0"
+authors = ["Mikail Bagishov <bagishov.mikail@yandex.ru>"]
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0.39"
+serde = "1.0.125"
+tracing = "0.1.25"
+dkregistry = { git = "https://github.com/mikailbag/dkregistry-rs", branch = "all" }
+invoker-api = { path = "../invoker-api" }
+puller = { git = "https://github.com/jjs-dev/commons" }
+tempfile = "3.2.0"
+base64 = "0.13.0"
+tokio = { version = "1.4.0", features = ["rt", "rt-multi-thread", "macros"] }
+tokio-util = "0.6.5"
+hyper = "0.14.4"
+warp = "0.3.0"
+serde_json = "1.0.64"
+futures = "0.3.13"
+clap = "3.0.0-beta.2"
+thiserror = "1.0.24"
+aho-corasick = "0.7.15"
+tracing-subscriber = "0.2.17"

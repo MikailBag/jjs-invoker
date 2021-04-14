@@ -1,2 +1,2 @@
-output = open('./file-exec-stdout').read().strip()
+output = open('./answer').read().strip()
 assert output == '236'

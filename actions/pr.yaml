@@ -133,6 +133,7 @@ jobs:
           mkdir images
           cp ./out/test-runner images/test-runner
           skopeo copy docker-daemon:jjs-invoker:latest dir:images/invoker
+          skopeo copy docker-daemon:jjs-invoker-shim:latest dir:images/shim
       - name: Upload images
         uses: actions/upload-artifact@v2
         with:
@@ -158,11 +159,12 @@ jobs:
       - name: Import images
         run: |
           skopeo copy dir:images/invoker docker-daemon:jjs-invoker:latest
+          skopeo copy dir:images/shim docker-daemon:jjs-invoker-shim:latest
       - name: Run tests
         run: |
           mkdir /tmp/logs
           chmod +x ./images/test-runner
-          ./images/test-runner --image=jjs-invoker --logs=/tmp/logs
+          ./images/test-runner --invoker-image=jjs-invoker --shim-image=jjs-invoker-shim --logs=/tmp/logs
       - name: Upload logs
         if: failure()
         uses: actions/upload-artifact@v2

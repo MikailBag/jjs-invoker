@@ -139,7 +139,7 @@ jobs:
       - name: Build images
         run: bash build.sh -p test-runner
       - name: Export images
-        run: "mkdir images\ncp ./out/test-runner images/test-runner\nskopeo copy docker-daemon:jjs-invoker:latest dir:images/invoker\n"
+        run: "mkdir images\ncp ./out/test-runner images/test-runner\nskopeo copy docker-daemon:jjs-invoker:latest dir:images/invoker\nskopeo copy docker-daemon:jjs-invoker-shim:latest dir:images/shim\n"
       - name: Upload images
         uses: actions/upload-artifact@v2
         with:
@@ -161,9 +161,9 @@ jobs:
           name: e2e-images
           path: images
       - name: Import images
-        run: "skopeo copy dir:images/invoker docker-daemon:jjs-invoker:latest\n"
+        run: "skopeo copy dir:images/invoker docker-daemon:jjs-invoker:latest\nskopeo copy dir:images/shim docker-daemon:jjs-invoker-shim:latest\n"
       - name: Run tests
-        run: "mkdir /tmp/logs\nchmod +x ./images/test-runner\n./images/test-runner --image=jjs-invoker --logs=/tmp/logs\n"
+        run: "mkdir /tmp/logs\nchmod +x ./images/test-runner\n./images/test-runner --invoker-image=jjs-invoker --shim-image=jjs-invoker-shim --logs=/tmp/logs\n"
       - name: Upload logs
         if: failure()
         uses: actions/upload-artifact@v2
