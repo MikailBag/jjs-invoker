@@ -1,6 +1,0 @@
-name: Install Rust toolchain
-uses: actions-rs/toolchain@v1
-with:
-  toolchain: nightly-2020-08-28
-  components: clippy,rustfmt
-  override: true
