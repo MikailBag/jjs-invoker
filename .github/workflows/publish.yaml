@@ -10,6 +10,8 @@ name: publish
 jobs:
   publish:
     if: github.event_name == 'push'
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     runs-on: ubuntu-20.04
     timeout-minutes: 15
     steps:
