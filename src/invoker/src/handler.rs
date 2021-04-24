@@ -1,3 +1,5 @@
+mod validate;
+
 use crate::{
     executor::{Executor, SandboxGlobalSettings},
     graph_interp::Interpreter,
@@ -90,6 +92,7 @@ impl Handler {
         &self,
         req: &InvokeRequest,
     ) -> anyhow::Result<InvokeResponse> {
+        validate::validate_request(req)?;
         self.print_request(req);
         let per_request_work_dir = self.cfg.work_dir.join(req.id.to_hyphenated().to_string());
         let mut interp = Interpreter::new(req);
