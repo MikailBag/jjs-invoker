@@ -1,3 +1,4 @@
 dockerImages:
   - jjs-invoker
+  - jjs-invoker-shim
 buildTimeoutMinutes: 15

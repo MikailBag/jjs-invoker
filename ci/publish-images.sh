@@ -14,3 +14,5 @@ fi
 echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
 docker tag jjs-invoker ghcr.io/jjs-dev/jjs-invoker:$TAG
 docker push ghcr.io/jjs-dev/jjs-invoker:$TAG
+docker tag jjs-invoker-shim ghcr.io/jjs-dev/jjs-invoker-shim:$TAG
+docker push ghcr.io/jjs-dev/jjs-invoker-shim:$TAG
