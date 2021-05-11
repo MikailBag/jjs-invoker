@@ -96,11 +96,20 @@ pub(crate) fn interpolate_command(
     Ok(res)
 }
 
-pub(crate) fn get_interpolation_dict(req_exts: &RequestExtensions) -> HashMap<String, String> {
+pub(crate) fn get_interpolation_dict(
+    req_exts: &RequestExtensions,
+) -> anyhow::Result<HashMap<String, String>> {
     let mut dict = HashMap::new();
     dict.insert("Os.Name".to_string(), "Linux".to_string());
     for (k, v) in req_exts.substitutions.clone() {
-        dict.insert(format!("Request.{}", k), v);
+        if let Some(prev) = dict.insert(k.clone(), v.clone()) {
+            anyhow::bail!(
+                "interpolation dictionary contains duplicates for key {}: {}, {}",
+                k,
+                v,
+                prev
+            );
+        }
     }
-    dict
+    Ok(dict)
 }

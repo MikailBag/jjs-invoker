@@ -3,7 +3,7 @@ use crate::toolchain::{PulledToolchain, ToolchainPuller};
 use anyhow::Context as _;
 use invoker_api::{
     invoke::{
-        Action, Command, EnvVarValue, EnvironmentVariable, Extensions, InvokeRequest,
+        Action, Command, EnvVarValue, EnvironmentVariable, Extensions, InputSource, InvokeRequest,
         SandboxSettings,
     },
     shim::{RequestExtensions, SandboxSettingsExtensions, EXTRA_FILES_DIR_NAME, WORK_DIR_NAME},
@@ -16,6 +16,16 @@ use std::{
 
 fn take_ext(ext: &mut Extensions) -> serde_json::Value {
     serde_json::Value::Object(std::mem::take(&mut ext.0))
+}
+
+async fn load_input(input: &InputSource) -> anyhow::Result<Vec<u8>> {
+    match input {
+        InputSource::LocalFile { path } => tokio::fs::read(path)
+            .await
+            .with_context(|| format!("failed to read {}", path.display())),
+        InputSource::InlineString { data } => Ok(data.as_bytes().to_vec()),
+        InputSource::InlineBase64 { data } => base64::decode(data).context("invalid base64"),
+    }
 }
 
 pub(crate) async fn transform_request(
@@ -49,12 +59,16 @@ pub(crate) async fn transform_request(
             anyhow::bail!("extraFiles.map specifies absolute path {}", k);
         }
         let path = local_extra_files_dir.join(k);
+        let v = load_input(v)
+            .await
+            .with_context(|| format!("failed to fetch input {}", k))?;
         tokio::fs::write(&path, v)
             .await
             .with_context(|| format!("failed to prepare extraFile {}", path.display()))?;
     }
 
-    let dict = crate::interp::get_interpolation_dict(&exts);
+    let dict = crate::interp::get_interpolation_dict(&exts)
+        .context("failed to prepare interpolation context")?;
 
     let mut tcx = TooclhainsUtil {
         invoker_exchange_dir: invoker_exchange_dir.to_path_buf(),

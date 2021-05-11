@@ -93,8 +93,10 @@ pub struct Input {
 pub enum InputSource {
     /// Data available as file on FS
     LocalFile { path: PathBuf },
-    /// Data provided inline
-    Inline { data: Vec<u8> },
+    /// Data provided inline as string
+    InlineString { data: String },
+    /// Data provided inline as a base64-encoded string
+    InlineBase64 { data: String },
 }
 
 #[derive(Serialize, Deserialize)]
