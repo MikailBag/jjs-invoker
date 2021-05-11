@@ -36,7 +36,7 @@ steps:
     action:
       createSandbox:
         name: compile
-        baseImage: ''
+        baseImage: ""
         workDir: /jjs
         expose:
           - hostPath: EXTRA_FILES/prog.cpp
@@ -83,7 +83,7 @@ steps:
     action:
       createSandbox:
         name: exec
-        baseImage: ''
+        baseImage: ""
         workDir: /jjs
         expose:
           - hostPath: WORK
@@ -95,28 +95,32 @@ steps:
           processCount: 16
           workDirSize: 32000000
 outputs:
-  - name: 'foo1'
+  - name: "foo1"
     target:
       file: compile-stdout
-  - name: 'foo2'
+  - name: "foo2"
     target:
       file: compile-stderr
-  - name: 'answer'
+  - name: "answer"
     target:
       file: exec-stdout
-  - name: 'foo3'
+  - name: "foo3"
     target:
       file: exec-stderr
 ext:
   extraFiles:
-    input.txt: "57 179"
-    prog.cpp: |
-      #include <iostream>
+    input.txt:
+      inlineString:
+        data: "57 179"
+    prog.cpp:
+      inlineString:
+        data: |
+          #include <iostream>
 
-      using namespace std;
+          using namespace std;
 
-      int main() {
-         int a, b;
-         cin >> a >> b;
-         cout << a + b;
-      }
+          int main() {
+              int a, b;
+              cin >> a >> b;
+              cout << a + b;
+          }

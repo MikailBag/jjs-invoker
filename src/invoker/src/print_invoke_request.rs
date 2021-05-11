@@ -18,12 +18,16 @@ impl PrintWrapper<'_> {
             let _s = w.begin("input");
             w.write_key_value("file-id", &inp.file_id);
             match &inp.source {
-                InputSource::Inline { data } => {
+                InputSource::InlineString { data } => {
                     w.write_key_value("inline", format_args!("{} bytes", data.len()))
                 }
                 InputSource::LocalFile { path } => {
                     w.write_key_value("local-path", path.display());
                 }
+                InputSource::InlineBase64 { data } => w.write_key_value(
+                    "inline",
+                    format_args!("{} base64-encoded bytes", data.len()),
+                ),
             }
         }
     }

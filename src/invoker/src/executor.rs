@@ -47,7 +47,13 @@ impl<'a> Executor<'a> {
     pub fn add_input(&mut self, input: &Input) -> anyhow::Result<()> {
         let slot = self.prepare_entry(&input.file_id)?;
         let file = match &input.source {
-            InputSource::Inline { data } => File::from_buffer(&data, "jjs-invoker")?,
+            InputSource::InlineString { data } => {
+                File::from_buffer(data.as_bytes(), "jjs-invoker")?
+            }
+            InputSource::InlineBase64 { data } => {
+                let data = base64::decode(&data).context("invalid base64")?;
+                File::from_buffer(&data, "jjs-invoker")?
+            }
             InputSource::LocalFile { path } => File::open_read(&path)?,
         };
         slot.insert(file);
