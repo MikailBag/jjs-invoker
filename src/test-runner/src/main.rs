@@ -72,7 +72,7 @@ fn main() -> anyhow::Result<()> {
             for _ in 0..10 {
                 let health = e.health()?;
                 println!("Health status: {:?}", health);
-                if health.iter().all(|h| *h == "healthy") {
+                if health.iter().all(|h| *h == "healthy" || *h == "<missing>") {
                     ready = true;
                     break;
                 }

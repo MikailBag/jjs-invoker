@@ -1,1 +1,5 @@
-target
+/target
+/docs
+/ci
+/.github
+/test-data
