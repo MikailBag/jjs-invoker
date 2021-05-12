@@ -24,6 +24,31 @@
 use serde::{ser::Error as _, Deserialize, Serialize};
 use std::{fmt, path::PathBuf};
 
+/// Location exposed to the sandbox
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub enum PathPrefix {
+    /// Host filesystem.
+    Host,
+    /// Volume
+    Volume(String),
+    /// Extension source (must be processed by the shim)
+    Extension(Extensions),
+}
+
+/// A path with the prefix
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct PrefixedPath {
+    /// The prefix
+    pub prefix: PathPrefix,
+    /// The path (must be relative)
+    #[serde(default)]
+    pub path: PathBuf,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
@@ -72,7 +97,7 @@ pub enum OutputRequestTarget {
     /// File id that should be exported
     File(FileId),
     /// Export local file by path
-    Path(PathBuf),
+    Path(PrefixedPath),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -179,8 +204,8 @@ pub enum SharedDirectoryMode {
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 pub struct SharedDir {
-    /// Absolute path inside the selected root.
-    pub host_path: PathBuf,
+    /// Shared path
+    pub host_path: PrefixedPath,
     /// Absolute path inside the sandbox.
     pub sandbox_path: PathBuf,
     /// Access mode
@@ -227,9 +252,6 @@ pub struct Limits {
     /// Process count limit.
     #[serde(default)]
     pub process_count: Option<u64>,
-    /// Working dir size limit in bytes
-    #[serde(default)]
-    pub work_dir_size: Option<u64>,
     #[serde(default)]
     pub ext: Extensions,
 }
@@ -250,13 +272,25 @@ pub struct SandboxSettings {
     pub base_image: PathBuf,
     /// Additional paths to mount into sandbox.
     pub expose: Vec<SharedDir>,
-    /// Path to the working directory.
-    /// Initially it will be empty, and it will be readable and writable
-    /// by all sandboxed processes.
-    pub work_dir: PathBuf,
     #[serde(default)]
     pub ext: Extensions,
 }
+
+/// Volume is a directory on invoker filesystem, which can be later
+/// exposed to sandboxes. Location of the volume is chosen by the invoker.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct VolumeSettings {
+    /// Volume name
+    pub name: String,
+    /// Volume size limit in bytes.
+    #[serde(default)]
+    pub limit: Option<u64>,
+    #[serde(default)]
+    pub ext: Extensions,
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
@@ -267,6 +301,7 @@ pub enum ActionResult {
     OpenNullFile,
     ExecuteCommand(CommandResult),
     CreateSandbox,
+    CreateVolume,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -314,7 +349,7 @@ pub enum Action {
     /// Associates file on local fs with a FileId
     OpenFile {
         /// Path to the file
-        path: PathBuf,
+        path: PrefixedPath,
         /// Id to associate with file
         id: FileId,
     },
@@ -324,6 +359,8 @@ pub enum Action {
     ExecuteCommand(Command),
     /// Specifies that sandbox should be created
     CreateSandbox(SandboxSettings),
+    /// Specifies that a volume should be created
+    CreateVolume(VolumeSettings),
 }
 
 /// Arbitrary key-value data (i.e. json Object), consumed by the shim.

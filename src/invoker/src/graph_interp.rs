@@ -86,7 +86,8 @@ fn order_in_phase(s: &Action) -> u8 {
         Action::CreateFile { .. }
         | Action::CreatePipe { .. }
         | Action::OpenFile { .. }
-        | Action::OpenNullFile { .. } => 0,
+        | Action::OpenNullFile { .. }
+        | Action::CreateVolume(..) => 0,
         Action::CreateSandbox(..) => 1,
         Action::ExecuteCommand(..) => 2,
     }

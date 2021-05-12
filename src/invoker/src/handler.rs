@@ -81,9 +81,12 @@ impl Handler {
                 .export(&file_id)
                 .await
                 .with_context(|| format!("failed to export file_id {}", file_id)),
-            OutputRequestTarget::Path(path) => tokio::fs::read(&path)
-                .await
-                .with_context(|| format!("failed to export path {}", path.display())),
+            OutputRequestTarget::Path(path) => {
+                let path = exec.get_path_resolver().resolve(path)?;
+                tokio::fs::read(&path)
+                    .await
+                    .with_context(|| format!("failed to export path {}", path.display()))
+            }
         }
     }
 

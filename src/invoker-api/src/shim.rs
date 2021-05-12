@@ -6,10 +6,6 @@ use std::collections::HashMap;
 
 pub const EXTRA_FILES_DIR_NAME: &str = "EXTRA_FILES";
 
-/// Host directory that can be mounted to sandboxes
-/// for file transfer
-pub const WORK_DIR_NAME: &str = "WORK";
-
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
@@ -31,4 +27,12 @@ pub struct RequestExtensions {
 pub struct SandboxSettingsExtensions {
     /// Image that contains toolchain files.
     pub image: String,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct SharedDirExtensionSource {
+    /// Name of the special source
+    pub name: String,
 }
