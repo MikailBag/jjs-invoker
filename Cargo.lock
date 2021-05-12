@@ -1188,7 +1188,7 @@ dependencies = [
 [[package]]
 name = "puller"
 version = "0.1.0"
-source = "git+https://github.com/jjs-dev/commons#489a4690957c5239eab69924b31b9ff2ac750efa"
+source = "git+https://github.com/jjs-dev/commons#f75c1a74790b00f1add1a79e283546ace09e91d6"
 dependencies = [
  "base64",
  "dkregistry",

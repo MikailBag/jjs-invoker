@@ -6,7 +6,6 @@ use std::{
     collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
 };
-use tracing::{debug, instrument};
 
 #[derive(Clone)]
 pub struct PulledToolchain {
@@ -82,23 +81,34 @@ impl ToolchainPuller {
     }
 
     /// Actually downloads and unpacks toolchain to specified dir.
-    #[instrument(skip(self, toolchain_image, target_dir))]
+    #[tracing::instrument(skip(self, toolchain_image, target_dir))]
     async fn extract_toolchain(
         &self,
         toolchain_image: &str,
         target_dir: &Path,
     ) -> anyhow::Result<ImageConfig> {
-        debug!(target_dir=%target_dir.display(), "downloading image");
-        tokio::fs::create_dir(target_dir)
-            .await
-            .context("failed to create target dir")?;
+        tracing::info!(target_dir=%target_dir.display(), "downloading image");
 
-        let settings = puller::PullSettings {
-            tls: if self.disable_tls {
+        let already_exists = tokio::fs::metadata(target_dir).await.is_ok();
+        if already_exists {
+            tracing::info!("image is already available in local filesystem")
+        }
+        if !already_exists {
+            tokio::fs::create_dir(target_dir)
+                .await
+                .context("failed to create target dir")?;
+        }
+        let settings = {
+            let tls = if self.disable_tls {
                 puller::Tls::Disable
             } else {
                 puller::Tls::Enable
-            },
+            };
+
+            puller::PullSettings {
+                tls,
+                skip_layers: already_exists,
+            }
         };
         let image_manifest = self
             .image_puller
@@ -122,11 +132,11 @@ impl ToolchainPuller {
 
         let image_config = ImageConfig::from_run_config(runtime_config)
             .context("failed to process config blob")?;
-        debug!("toolchain has been pulled successfully");
+        tracing::info!("toolchain has been pulled successfully");
         Ok(image_config)
     }
 
-    #[instrument(skip(self))]
+    #[tracing::instrument(skip(self))]
     pub async fn resolve(&self, toolchain_image: &str) -> anyhow::Result<PulledToolchain> {
         if let Some(info) = self.cache.get(toolchain_image) {
             return Ok(info.clone());
