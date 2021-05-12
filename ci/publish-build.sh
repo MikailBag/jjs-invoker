@@ -1,3 +1,4 @@
 set -euxo pipefail
 
-bash ./build.sh --release
+export DOCKER_BUILDKIT=1
+bash ./scripts/build-all.sh --release

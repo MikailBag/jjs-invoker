@@ -1,6 +1,5 @@
 [profile.release]
 lto = true
-debug = 1
 
 [profile.dev]
 debug = 1

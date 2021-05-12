@@ -7,8 +7,10 @@ sudo add-apt-repository \
   stable"
 sudo apt-get update
 sudo apt-get install -y docker-ce docker-ce-cli containerd.io
-          
-bash build.sh -p test-runner
+
+bash ./scripts/build-all.sh
+export RUSTC_BOOTSTRAP=1
+cargo build -p test-runner -Zunstable-options --out-dir ./out
 
 mkdir e2e-artifacts
 cp ./out/test-runner e2e-artifacts/test-runner
