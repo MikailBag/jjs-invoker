@@ -131,6 +131,9 @@ impl<'a> Executor<'a> {
                 )
                 .await
                 .context("failed to create sandbox")?;
+                if self.sandbox_global_settings.leak {
+                    sandbox.leak();
+                }
                 self.sandboxes
                     .insert(sandbox_settings.name.clone(), sandbox);
                 Ok(ActionResult::CreateSandbox)
