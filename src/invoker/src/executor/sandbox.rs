@@ -1,4 +1,4 @@
-use crate::executor::path_resolver::PathResolver;
+use crate::{executor::path_resolver::PathResolver, interactive_debug::Suspender};
 use anyhow::Context as _;
 use invoker_api::invoke::{SandboxSettings, SharedDirectoryMode};
 use minion::{SharedItem, SharedItemKind};
@@ -20,6 +20,7 @@ pub struct SandboxGlobalSettings {
     pub override_id_range: Option<(u32, u32)>,
     pub leak: bool,
     pub allow_fallback_pid_limit: bool,
+    pub suspender: Arc<Suspender>,
 }
 
 fn default_process_limit(s: &SandboxGlobalSettings) -> u64 {
@@ -150,6 +151,16 @@ impl Sandbox {
         let sandbox = backend
             .new_sandbox(sandbox_options)
             .context("failed to create minion sandbox")?;
+
+        let debug_data = sandbox
+            .debug_info()
+            .context("failed to get sandbox debugging information")?;
+        global_settings
+            .suspender
+            .suspend(debug_data)
+            .await
+            .context("failed to wait for debugger attach")?;
+
         Ok(Sandbox { sandbox })
     }
 

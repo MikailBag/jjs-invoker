@@ -4,6 +4,7 @@ mod executor;
 mod graph_interp;
 mod handler;
 mod init;
+mod interactive_debug;
 mod print_invoke_request;
 mod server;
 mod shim;
@@ -14,7 +15,7 @@ use cli_args::IdRange;
 use executor::SandboxGlobalSettings;
 use handler::{Handler, HandlerConfig};
 use shim::ShimClient;
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 use tracing_subscriber::{filter::EnvFilter, fmt::format::FmtSpan};
 
 #[derive(Clap, Debug)]
@@ -50,6 +51,12 @@ struct CliArgs {
     /// file descriptors and other system resources on each request.
     #[clap(long)]
     debug_leak_sandboxes: bool,
+    /// Enables file-based interactive debugging mode.
+    ///
+    /// This flag takes a path to the existing directory as an argument.
+    /// Invoker will print path that must be touched for sandbox to resume
+    #[clap(long)]
+    interactive_debug_path: Option<PathBuf>,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -69,8 +76,11 @@ fn main() -> anyhow::Result<()> {
 #[tokio::main]
 async fn real_main(args: CliArgs) -> anyhow::Result<()> {
     let handler_cfg = HandlerConfig {
-        work_dir: args.work_dir,
+        work_dir: args.work_dir.clone(),
     };
+
+    let interactive_debug_suspender = interactive_debug::Suspender::new(&args);
+
     let sandbox_cfg = SandboxGlobalSettings {
         // TODO: add CLI arg
         exposed_host_items: None,
@@ -79,6 +89,7 @@ async fn real_main(args: CliArgs) -> anyhow::Result<()> {
         leak: args.debug_leak_sandboxes,
         // TODO: revisit when rootless mode is added
         allow_fallback_pid_limit: false,
+        suspender: Arc::new(interactive_debug_suspender),
     };
     let handler = Handler::new(handler_cfg, sandbox_cfg)
         .await
