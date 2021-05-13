@@ -21,7 +21,6 @@ jobs:
     - name: Build e2e artifacts
       run: bash ci/e2e-build.sh
     - name: Upload e2e artifacts
-      if: always()
       uses: actions/upload-artifact@v2
       with:
         name: e2e-artifacts
@@ -42,6 +41,7 @@ jobs:
     - name: Execute tests
       run: bash ci/e2e-run.sh
     - name: Upload logs
+      if: always()
       uses: actions/upload-artifact@v2
       with:
         name: e2e-logs

@@ -1,3 +1,4 @@
+use crate::executor::path_resolver::PathResolver;
 use anyhow::Context as _;
 use invoker_api::invoke::{SandboxSettings, SharedDirectoryMode};
 use minion::{SharedItem, SharedItemKind};
@@ -8,47 +9,9 @@ use std::{
     time::Duration,
 };
 use tokio::fs;
-use tracing::{debug, error};
-
-/// Owns `tmpfs`, mounted into sandbox.
-struct Tmpfs {
-    path: PathBuf,
-}
-
-// 16 MiB
-const DEFAULT_WORK_DIR_SIZE_LIMIT: u64 = 1 << 24;
-
-impl Tmpfs {
-    #[cfg(target_os = "linux")]
-    fn new(settings: &SandboxSettings, path: &Path) -> anyhow::Result<Self> {
-        let quota = settings.limits.work_dir_size;
-        let quota = minion::linux::ext::Quota::bytes(quota.unwrap_or(DEFAULT_WORK_DIR_SIZE_LIMIT));
-        minion::linux::ext::make_tmpfs(path, quota)
-            .context("failed to set size limit on shared directory")?;
-        Ok(Tmpfs {
-            path: path.to_path_buf(),
-        })
-    }
-}
-
-impl Drop for Tmpfs {
-    fn drop(&mut self) {
-        if let Err(err) = nix::mount::umount2(&self.path, nix::mount::MntFlags::MNT_DETACH) {
-            error!(
-                "Leaking tmpfs at {}: umount2 failed: {}",
-                self.path.display(),
-                err
-            )
-        } else {
-            debug!("Successfully destroyed tmpfs at {}", self.path.display())
-        }
-    }
-}
 
 pub struct Sandbox {
     sandbox: Arc<dyn minion::erased::Sandbox>,
-    // RAII owner
-    _tmpfs: Tmpfs,
 }
 
 pub struct SandboxGlobalSettings {
@@ -71,6 +34,7 @@ impl Sandbox {
         backend: &dyn minion::erased::Backend,
         settings: &SandboxSettings,
         global_settings: &SandboxGlobalSettings,
+        path_resolver: &PathResolver,
     ) -> anyhow::Result<Self> {
         let mut shared_items = vec![];
 
@@ -116,15 +80,13 @@ impl Sandbox {
                 SharedDirectoryMode::ReadOnly => minion::SharedItemKind::Readonly,
                 SharedDirectoryMode::ReadWrite => minion::SharedItemKind::Full,
             };
+            let host_path = path_resolver.resolve(&item.host_path)?;
             if item.create {
-                tokio::fs::create_dir_all(&item.host_path).await?;
+                tokio::fs::create_dir_all(&host_path).await?;
             }
             // TODO: is this best way?
             {
-                let current_mode = tokio::fs::metadata(&item.host_path)
-                    .await?
-                    .permissions()
-                    .mode();
+                let current_mode = tokio::fs::metadata(&host_path).await?.permissions().mode();
                 if let SharedDirectoryMode::ReadWrite = item.mode {
                     // copies access for owner to access for group and others
                     let our_access = (current_mode >> 6) & 0b111;
@@ -132,16 +94,16 @@ impl Sandbox {
                     let perms = PermissionsExt::from_mode(mode);
                     tracing::debug!(
                         "changing permissions for {} from {:o} to {:o}",
-                        item.host_path.display(),
+                        host_path.display(),
                         current_mode,
                         mode
                     );
-                    tokio::fs::set_permissions(&item.host_path, perms).await?;
+                    tokio::fs::set_permissions(&host_path, perms).await?;
                 }
             }
             let shared_item = minion::SharedItem {
                 id: None,
-                src: item.host_path.clone(),
+                src: host_path.clone(),
                 dest: item.sandbox_path.clone(),
                 kind,
                 flags: Vec::new(),
@@ -152,19 +114,6 @@ impl Sandbox {
         tokio::fs::create_dir_all(&sandbox_data_dir)
             .await
             .context("failed to create sandbox data directory")?;
-
-        let sandbox_work_dir = sandbox_data_dir.join("data");
-
-        let t = Tmpfs::new(settings, &sandbox_work_dir)
-            .context("failed to allocate sandbox working directory")?;
-
-        shared_items.push(minion::SharedItem {
-            id: None,
-            src: sandbox_work_dir,
-            dest: settings.work_dir.clone(),
-            kind: minion::SharedItemKind::Full,
-            flags: Vec::new(),
-        });
 
         for item in &shared_items {
             validate_shared_item(item).await;
@@ -192,7 +141,7 @@ impl Sandbox {
         let sandbox = backend
             .new_sandbox(sandbox_options)
             .context("failed to create minion sandbox")?;
-        Ok(Sandbox { sandbox, _tmpfs: t })
+        Ok(Sandbox { sandbox })
     }
 
     /// Makes sure that inner sandbox will not be dropped
@@ -243,6 +192,6 @@ async fn do_validate_shared_item(item: &SharedItem) -> anyhow::Result<()> {
             Ok(())
         }
 
-        Err(err) => return Err(err).context("path it not accessible to invoker"),
+        Err(err) => Err(err).context("path it not accessible to invoker"),
     }
 }

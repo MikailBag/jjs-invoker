@@ -1,4 +1,4 @@
-use invoker_api::invoke::{Action, Command, InvokeRequest, SandboxSettings, Step};
+use invoker_api::invoke::{Action, Command, InvokeRequest, SandboxSettings, Step, VolumeSettings};
 
 fn request_has_extensions(req: &InvokeRequest) -> bool {
     let InvokeRequest {
@@ -52,6 +52,7 @@ fn step_has_extensions(step: &Step) -> bool {
         Action::OpenFile { path: _, id: _ } => false,
         Action::OpenNullFile { id: _ } => false,
         Action::ExecuteCommand(cmd) => command_has_extensions(cmd),
+        Action::CreateVolume(vol) => volume_has_extensions(vol),
     }
 }
 
@@ -84,7 +85,6 @@ fn sandbox_has_extensions(sb: &SandboxSettings) -> bool {
         name: _,
         base_image: _,
         expose,
-        work_dir: _,
         ext,
     } = sb;
 
@@ -100,6 +100,10 @@ fn sandbox_has_extensions(sb: &SandboxSettings) -> bool {
         }
     }
     false
+}
+
+fn volume_has_extensions(vol: &VolumeSettings) -> bool {
+    !vol.ext.0.is_empty()
 }
 
 pub(super) fn validate_request(req: &InvokeRequest) -> anyhow::Result<()> {

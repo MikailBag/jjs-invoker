@@ -1,9 +1,11 @@
 mod file;
+mod path_resolver;
 mod sandbox;
+mod volume;
 
 pub use sandbox::SandboxGlobalSettings;
 
-use self::{file::File, sandbox::Sandbox};
+use self::{file::File, path_resolver::PathResolver, sandbox::Sandbox, volume::Volume};
 use anyhow::Context;
 use invoker_api::invoke::{
     Action, ActionResult, CommandResult, EnvVarValue, FileId, Input, InputSource,
@@ -24,6 +26,10 @@ pub struct Executor<'a> {
     files: HashMap<FileId, File>,
     /// Map from sandbox name to sandbox object
     sandboxes: HashMap<String, Sandbox>,
+    /// map from volume name to volume object
+    volumes: HashMap<String, Volume>,
+    /// Utility for resolving path references
+    path_resolver: PathResolver,
     work_dir: &'a Path,
     minion: &'a dyn minion::erased::Backend,
     sandbox_global_settings: &'a SandboxGlobalSettings,
@@ -36,9 +42,11 @@ impl<'a> Executor<'a> {
         sandbox_global_settings: &'a SandboxGlobalSettings,
     ) -> Self {
         Executor {
-            work_dir,
             files: HashMap::new(),
             sandboxes: HashMap::new(),
+            volumes: HashMap::new(),
+            path_resolver: PathResolver::new(),
+            work_dir,
             minion,
             sandbox_global_settings,
         }
@@ -58,6 +66,10 @@ impl<'a> Executor<'a> {
         };
         slot.insert(file);
         Ok(())
+    }
+
+    pub fn get_path_resolver(&self) -> &PathResolver {
+        &self.path_resolver
     }
 
     pub async fn export(&mut self, id: &FileId) -> anyhow::Result<Vec<u8>> {
@@ -96,8 +108,9 @@ impl<'a> Executor<'a> {
                 Ok(ActionResult::CreateFile)
             }
             Action::OpenFile { path, id } => {
+                let path = self.path_resolver.resolve(path)?;
                 let slot = self.prepare_entry(id)?;
-                let file = File::open_read(path)
+                let file = File::open_read(&path)
                     .with_context(|| format!("failed to open {}", path.display()))?;
                 slot.insert(file);
                 Ok(ActionResult::OpenFile)
@@ -128,6 +141,7 @@ impl<'a> Executor<'a> {
                     &*self.minion,
                     sandbox_settings,
                     &self.sandbox_global_settings,
+                    &self.path_resolver,
                 )
                 .await
                 .context("failed to create sandbox")?;
@@ -242,6 +256,18 @@ impl<'a> Executor<'a> {
                     cpu_time: resource_usage.time,
                     memory: resource_usage.memory,
                 }))
+            }
+            Action::CreateVolume(settings) => {
+                if self.volumes.contains_key(&settings.name) {
+                    anyhow::bail!("Volume with name {} already exists", settings.name);
+                }
+                let volume_dir = self.work_dir.join("volumes").join(&settings.name);
+                let v = Volume::create(settings, &volume_dir)
+                    .await
+                    .context("failed to create volume")?;
+                self.volumes.insert(settings.name.clone(), v);
+                self.path_resolver.add_volume(&settings.name, &volume_dir);
+                Ok(ActionResult::CreateVolume)
             }
         }
     }

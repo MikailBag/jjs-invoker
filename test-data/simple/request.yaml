@@ -34,27 +34,40 @@ steps:
         id: dev-null
   - stage: 0
     action:
+      createVolume:
+        name: compile
+        limit: 32000000
+  - stage: 0
+    action:
       createSandbox:
         name: compile
         baseImage: ""
-        workDir: /jjs
         expose:
-          - hostPath: EXTRA_FILES/prog.cpp
+          - hostPath:
+              prefix:
+                extension:
+                  name: EXTRA_FILES
+              path: prog.cpp
             sandboxPath: /prog.cpp
             mode: readOnly
-          - hostPath: WORK
+          - hostPath:
+              prefix:
+                volume: compile
             sandboxPath: /out/
             mode: readWrite
         limits:
           memory: 256000000
           time: 5000
           processCount: 16
-          workDirSize: 32000000
   - stage: 1
     action:
       openFile:
         id: exec-stdin
-        path: EXTRA_FILES/input.txt
+        path: 
+          path: input.txt
+          prefix:
+            extension:
+              name: EXTRA_FILES
   - stage: 1
     action:
       executeCommand:
@@ -84,16 +97,16 @@ steps:
       createSandbox:
         name: exec
         baseImage: ""
-        workDir: /jjs
         expose:
-          - hostPath: WORK
+          - hostPath:
+              prefix:
+                volume: compile
             sandboxPath: /inp
             mode: readOnly
         limits:
           memory: 256000000
           time: 5000
           processCount: 16
-          workDirSize: 32000000
 outputs:
   - name: "foo1"
     target:
