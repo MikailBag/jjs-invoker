@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 invoker-api = { path = "../invoker-api" }
 anyhow = "1.0.38"
-clap = "3.0.0-beta.2"
+clap = { version = "3.0.0-beta.2", features = ["std", "derive"], default-features = false }
 serde_json = "1.0.64"
 rand = "0.8.3"
 xshell = "0.1.9"
