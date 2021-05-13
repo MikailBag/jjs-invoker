@@ -19,10 +19,18 @@ pub struct SandboxGlobalSettings {
     pub skip_system_checks: bool,
     pub override_id_range: Option<(u32, u32)>,
     pub leak: bool,
+    pub allow_fallback_pid_limit: bool,
 }
 
-// TODO: relax when using cgroups
-const DEFAULT_PROCESS_COUNT: u64 = 1;
+fn default_process_limit(s: &SandboxGlobalSettings) -> u64 {
+    if s.allow_fallback_pid_limit {
+        // fallback implementation only supports 1 process per sandbox
+        1
+    } else {
+        // otherwise let's apply limit that should be sufficient
+        16
+    }
+}
 
 impl Sandbox {
     pub fn raw_sandbox(&self) -> Arc<dyn minion::erased::Sandbox> {
@@ -130,7 +138,8 @@ impl Sandbox {
             max_alive_process_count: settings
                 .limits
                 .process_count
-                .unwrap_or(DEFAULT_PROCESS_COUNT) as _,
+                .unwrap_or_else(|| default_process_limit(global_settings))
+                as _,
             memory_limit: settings.limits.memory,
             shared_items,
             isolation_root: chroot_dir,

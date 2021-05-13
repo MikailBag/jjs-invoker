@@ -77,6 +77,8 @@ async fn real_main(args: CliArgs) -> anyhow::Result<()> {
         skip_system_checks: args.skip_checks,
         override_id_range: args.sandbox_id_range.as_ref().map(|r| (r.low, r.high)),
         leak: args.debug_leak_sandboxes,
+        // TODO: revisit when rootless mode is added
+        allow_fallback_pid_limit: false,
     };
     let handler = Handler::new(handler_cfg, sandbox_cfg)
         .await
