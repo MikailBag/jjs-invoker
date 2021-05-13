@@ -42,6 +42,14 @@ struct CliArgs {
     /// will be used.
     #[clap(long)]
     sandbox_id_range: Option<IdRange>,
+    /// Do not cleanup sandboxes.
+    /// This flag completely disables sandbox destruction logic, making
+    /// debugging more simple.
+    ///
+    /// CAUTION: setting this flags means that invoker will leak memory,
+    /// file descriptors and other system resources on each request.
+    #[clap(long)]
+    debug_leak_sandboxes: bool,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -51,6 +59,9 @@ fn main() -> anyhow::Result<()> {
         .init();
     let args: CliArgs = Clap::parse();
     tracing::debug!(args = ?args);
+    if args.debug_leak_sandboxes {
+        tracing::warn!("dangerous --debug-leak-sandboxes flag was enabled");
+    }
     init::init()?;
     real_main(args)
 }
@@ -65,6 +76,7 @@ async fn real_main(args: CliArgs) -> anyhow::Result<()> {
         exposed_host_items: None,
         skip_system_checks: args.skip_checks,
         override_id_range: args.sandbox_id_range.as_ref().map(|r| (r.low, r.high)),
+        leak: args.debug_leak_sandboxes,
     };
     let handler = Handler::new(handler_cfg, sandbox_cfg)
         .await

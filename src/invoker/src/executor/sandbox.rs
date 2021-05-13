@@ -55,6 +55,7 @@ pub struct SandboxGlobalSettings {
     pub exposed_host_items: Option<Vec<String>>,
     pub skip_system_checks: bool,
     pub override_id_range: Option<(u32, u32)>,
+    pub leak: bool,
 }
 
 // TODO: relax when using cgroups
@@ -192,6 +193,13 @@ impl Sandbox {
             .new_sandbox(sandbox_options)
             .context("failed to create minion sandbox")?;
         Ok(Sandbox { sandbox, _tmpfs: t })
+    }
+
+    /// Makes sure that inner sandbox will not be dropped
+    pub fn leak(&self) {
+        tracing::info!("preventing cleanup for the sandbox");
+        let t = self.sandbox.clone();
+        std::mem::forget(t);
     }
 }
 
