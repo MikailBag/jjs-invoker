@@ -673,6 +673,7 @@ dependencies = [
  "minion",
  "nix",
  "once_cell",
+ "rand",
  "reqwest",
  "serde",
  "serde_json",
@@ -810,7 +811,7 @@ dependencies = [
 [[package]]
 name = "minion"
 version = "0.1.0"
-source = "git+https://github.com/jjs-dev/minion?rev=337acd8e#337acd8eebdbae29967b0a997c98b296ed90783b"
+source = "git+https://github.com/jjs-dev/minion?rev=7eddbc87#7eddbc87ae5acf3ca8d820ce8fc7dbd06bb3ae7f"
 dependencies = [
  "anyhow",
  "backtrace",
