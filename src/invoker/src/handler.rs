@@ -75,16 +75,25 @@ impl Handler {
         &self,
         exec: &mut Executor<'_>,
         output_req: &OutputRequestTarget,
-    ) -> anyhow::Result<Vec<u8>> {
+    ) -> anyhow::Result<Option<Vec<u8>>> {
         match output_req {
             OutputRequestTarget::File(file_id) => exec
                 .export(&file_id)
                 .await
+                .map(Some)
                 .with_context(|| format!("failed to export file_id {}", file_id)),
             OutputRequestTarget::Path(path) => {
                 let path = exec.get_path_resolver().resolve(path)?;
                 tokio::fs::read(&path)
                     .await
+                    .map(Some)
+                    .or_else(|err| {
+                        if err.kind() == std::io::ErrorKind::NotFound {
+                            Ok(None)
+                        } else {
+                            Err(err)
+                        }
+                    })
                     .with_context(|| format!("failed to export path {}", path.display()))
             }
         }
@@ -152,13 +161,22 @@ impl Handler {
                 .get_output(&mut exec, &output_req.target)
                 .await
                 .with_context(|| format!("Failed to get output #{}", pos))?;
-            tracing::debug!(output_id = pos, byte_count = data.len());
-            let data = base64::encode(&data);
+            if let Some(data) = data {
+                tracing::debug!(output_id = pos, byte_count = data.len(), missing = false);
+                let data = base64::encode(&data);
 
-            response.outputs.push(Output {
-                name: output_req.name.clone(),
-                data: OutputData::InlineBase64(data),
-            });
+                response.outputs.push(Output {
+                    name: output_req.name.clone(),
+                    data: OutputData::InlineBase64(data),
+                });
+            } else {
+                tracing::debug!(output_id = pos, missing = true);
+
+                response.outputs.push(Output {
+                    name: output_req.name.clone(),
+                    data: OutputData::None,
+                });
+            }
         }
         Ok(response)
     }

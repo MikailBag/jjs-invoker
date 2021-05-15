@@ -140,6 +140,10 @@ pub struct Output {
 pub enum OutputData {
     /// Base64-encoded data
     InlineBase64(String),
+    /// Output missing. This is returned when output request
+    /// referenced a path, and the path does not exist (i.e. unknown file ids
+    /// still result in an error).
+    None,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
