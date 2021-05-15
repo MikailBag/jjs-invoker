@@ -194,7 +194,10 @@ fn export_response(req: &InvokeRequest, res: &InvokeResponse, path: &Path) -> an
     for (req_out, res_out) in request_outputs.iter().zip(response_outputs.iter()) {
         let output_name = req_out.name.clone();
         println!("Exporting output {}", output_name);
-        let OutputData::InlineBase64(output_value) = &res_out.data;
+        let output_value = match &res_out.data {
+            OutputData::InlineBase64(v) => v,
+            OutputData::None => anyhow::bail!("missing output"),
+        };
         let output_value = base64::decode(output_value).context("invalid base64")?;
         std::fs::write(path.join(output_name), output_value)?;
     }
