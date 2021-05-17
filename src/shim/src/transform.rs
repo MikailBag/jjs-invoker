@@ -65,6 +65,14 @@ pub(crate) async fn transform_request(
         let v = load_input(v)
             .await
             .with_context(|| format!("failed to fetch input {}", k))?;
+        if let Some(parent) = path.parent() {
+            tokio::fs::create_dir_all(&parent).await.with_context(|| {
+                format!(
+                    "failed to create parent directory for extraFile: {}",
+                    path.display()
+                )
+            })?;
+        }
         tokio::fs::write(&path, v)
             .await
             .with_context(|| format!("failed to prepare extraFile {}", path.display()))?;
