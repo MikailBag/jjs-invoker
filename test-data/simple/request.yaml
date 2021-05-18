@@ -63,7 +63,7 @@ steps:
     action:
       openFile:
         id: exec-stdin
-        path: 
+        path:
           path: input.txt
           prefix:
             extension:
@@ -123,17 +123,19 @@ outputs:
 ext:
   extraFiles:
     input.txt:
-      inlineString:
-        data: "57 179"
+      contents:
+        inlineString:
+          data: "57 179"
     prog.cpp:
-      inlineString:
-        data: |
-          #include <iostream>
+      contents:
+        inlineString:
+          data: |
+            #include <iostream>
 
-          using namespace std;
+            using namespace std;
 
-          int main() {
-              int a, b;
-              cin >> a >> b;
-              cout << a + b;
-          }
+            int main() {
+                int a, b;
+                cin >> a >> b;
+                cout << a + b;
+            }
