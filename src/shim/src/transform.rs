@@ -11,6 +11,8 @@ use invoker_api::{
         EXTRA_FILES_DIR_NAME,
     },
 };
+#[cfg(target_os = "linux")]
+use std::os::unix::fs::PermissionsExt;
 use std::{
     collections::{HashMap, HashSet},
     path::{Component, Path, PathBuf},
@@ -62,7 +64,7 @@ pub(crate) async fn transform_request(
             anyhow::bail!("extraFiles.map specifies absolute path {}", k);
         }
         let path = local_extra_files_dir.join(k);
-        let v = load_input(v)
+        let contents = load_input(&v.contents)
             .await
             .with_context(|| format!("failed to fetch input {}", k))?;
         if let Some(parent) = path.parent() {
@@ -73,9 +75,19 @@ pub(crate) async fn transform_request(
                 )
             })?;
         }
-        tokio::fs::write(&path, v)
+        tokio::fs::write(&path, contents)
             .await
             .with_context(|| format!("failed to prepare extraFile {}", path.display()))?;
+        if v.executable {
+            let mut m = tokio::fs::metadata(&path)
+                .await
+                .with_context(|| format!("failed to read current metadata of {}", path.display()))?
+                .permissions();
+            m.set_mode(m.mode() | 0o111);
+            tokio::fs::set_permissions(&path, m)
+                .await
+                .with_context(|| format!("failed to update permissions for {}", path.display()))?;
+        }
     }
 
     let dict = crate::interp::get_interpolation_dict(&exts)
