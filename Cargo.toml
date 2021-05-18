@@ -5,7 +5,7 @@ lto = true
 debug = 1
 
 [workspace]
-members=["src/invoker", "src/invoker-api", "src/shim", "src/test-runner"]
+members=["src/invoker", "src/invoker-api", "src/shim", "src/test-runner", "src/strace-debugger"]
 
 # Makes image pulls faster
 [profile.dev.package.libflate]

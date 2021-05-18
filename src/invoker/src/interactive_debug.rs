@@ -1,3 +1,5 @@
+use anyhow::Context;
+use invoker_api::debug::AttachRequest;
 use rand::Rng;
 use std::{path::PathBuf, time::Instant};
 
@@ -7,6 +9,7 @@ pub struct Suspender(Mode);
 enum Mode {
     None,
     Dir(PathBuf),
+    Http(String, reqwest::Client),
 }
 
 fn generate_token() -> String {
@@ -22,10 +25,13 @@ impl Suspender {
         if let Some(p) = &args.interactive_debug_path {
             return Suspender(Mode::Dir(p.clone()));
         }
+        if let Some(url) = &args.interactive_debug_url {
+            return Suspender(Mode::Http(url.clone(), reqwest::Client::new()));
+        }
         Suspender(Mode::None)
     }
 
-    pub(crate) async fn suspend(&self, data: serde_json::Value) -> anyhow::Result<()> {
+    pub(crate) async fn suspend(&self, data: AttachRequest) -> anyhow::Result<()> {
         let begin = Instant::now();
         match &self.0 {
             Mode::None => {}
@@ -42,6 +48,16 @@ impl Suspender {
                         break;
                     }
                 }
+            }
+            Mode::Http(url, client) => {
+                client
+                    .post(url)
+                    .json(&data)
+                    .send()
+                    .await
+                    .context("failed to connect to interactive debugging webhook")?
+                    .error_for_status()
+                    .context("interactive debugger webhook failed")?;
             }
         }
         let elapsed = begin.elapsed();

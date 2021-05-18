@@ -16,3 +16,4 @@ mkdir e2e-artifacts
 cp ./out/test-runner e2e-artifacts/test-runner
 skopeo copy docker-daemon:jjs-invoker:latest dir:e2e-artifacts/invoker
 skopeo copy docker-daemon:jjs-invoker-shim:latest dir:e2e-artifacts/shim
+skopeo copy docker-daemon:jjs-invoker-strace-debugger:latest dir:e2e-artifacts/debugger

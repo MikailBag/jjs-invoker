@@ -5,6 +5,7 @@ fn generate_compose_config(
     work_dir: &Path,
     invoker_image: &str,
     shim_image: &str,
+    debug_image: &str,
 ) -> serde_json::Value {
     serde_json::json!({
         "services": {
@@ -23,6 +24,7 @@ fn generate_compose_config(
                         "read_only": true,
                     }
                 ],
+                "pid": "host",
                 "privileged": true,
                 "command":[
                     "--work-dir",
@@ -30,6 +32,7 @@ fn generate_compose_config(
                     "--listen-address",
                     "tcp://0.0.0.0:8000",
                     "--shim=http://shim:8001",
+                    "--interactive-debug-url=http://debug:8000/debug"
                 ],
                 "environment": {
                     "RUST_BACKTRACE": "1",
@@ -58,6 +61,22 @@ fn generate_compose_config(
                     "RUST_LOG": "info,puller=trace,shim=trace",
                 }
             },
+            "debug": {
+                "image": debug_image,
+                "volumes": [
+                    {
+                        "type": "bind",
+                        "source": format!("{}/strace", work_dir.display()),
+                        "target": "/var/jjs/debug/strace"
+                    }
+                ],
+                "pid": "host",
+                "environment": {
+                    "RUST_BACKTRACE": "1",
+                    "RUST_LOG": "info,strace_debugger=trace"
+                },
+                "privileged": true
+            },
             "registry": {
                 "image": "docker.io/library/registry:2",
                 "ports": ["5000"]
@@ -81,12 +100,14 @@ impl Env {
         work_dir: &Path,
         invoker_image: &str,
         shim_image: &str,
+        debug_image: &str,
     ) -> anyhow::Result<Self> {
         let compose_dir = work_dir.join("compose");
         std::fs::create_dir_all(&compose_dir)?;
         std::fs::create_dir_all(work_dir.join("judges"))?;
+        std::fs::create_dir_all(work_dir.join("strace"))?;
 
-        let config = generate_compose_config(work_dir, invoker_image, shim_image);
+        let config = generate_compose_config(work_dir, invoker_image, shim_image, debug_image);
         let config = serde_json::to_string_pretty(&config)?;
         std::fs::write(compose_dir.join("docker-compose.yaml"), config)?;
 

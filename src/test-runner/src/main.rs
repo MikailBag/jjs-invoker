@@ -15,6 +15,8 @@ struct CliArgs {
     #[clap(long)]
     shim_image: String,
     #[clap(long)]
+    strace_debug_image: String,
+    #[clap(long)]
     logs: PathBuf,
     #[clap(long)]
     test_cases_path: Option<PathBuf>,
@@ -36,6 +38,8 @@ fn main() -> anyhow::Result<()> {
     xshell::cmd!("docker inspect --format=OK {invoker_image}").run()?;
     let shim_image = &args.shim_image;
     xshell::cmd!("docker inspect --format=OK {shim_image}").run()?;
+    let debug_image = &args.strace_debug_image;
+    xshell::cmd!("docker inspect --format=OK {debug_image}").run()?;
 
     if !test_cases_path.exists() {
         anyhow::bail!("Path {} does not exist", test_cases_path.display());
@@ -63,7 +67,13 @@ fn main() -> anyhow::Result<()> {
 
         std::fs::create_dir_all(&work_dir_path)?;
         let env_name = randomize(&format!("jjs-invoker-test-suite-{}", name));
-        let e = Env::new(&env_name, &work_dir_path, invoker_image, shim_image)?;
+        let e = Env::new(
+            &env_name,
+            &work_dir_path,
+            invoker_image,
+            shim_image,
+            debug_image,
+        )?;
 
         e.start()?;
         println!("Waiting for container readiness");
