@@ -112,6 +112,7 @@ impl Handler {
             &per_request_work_dir,
             &*self.minion_backend,
             &self.sandbox_global_settings,
+            req.id,
         );
 
         for input in &req.inputs {

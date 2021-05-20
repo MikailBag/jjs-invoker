@@ -31,5 +31,11 @@ ENTRYPOINT [ "/usr/local/bin/shim" ]
 EXPOSE 8001
 CMD [ "--port", "8001" ]
 
+FROM ubuntu:focal as strace-debug
+RUN apt update && apt install -y strace
+COPY --from=build /app/out/strace-debugger /usr/local/bin/debugger
+ENTRYPOINT [ "/usr/local/bin/debugger" ]
+EXPOSE 8000
+
 FROM scratch
 RUN you have forgotten to specify build target

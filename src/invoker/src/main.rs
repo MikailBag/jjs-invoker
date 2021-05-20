@@ -55,8 +55,14 @@ struct CliArgs {
     ///
     /// This flag takes a path to the existing directory as an argument.
     /// Invoker will print path that must be touched for sandbox to resume
-    #[clap(long)]
+    #[clap(long, conflicts_with = "interactive-debug-url")]
     interactive_debug_path: Option<PathBuf>,
+    /// Enables HTTP-based interactive debugging mode.
+    ///
+    /// This flag receives a url as an argument. Invoker will send POST requests
+    /// to this url and will resume when successful response is returned.
+    #[clap(long, conflicts_with = "interactive-debug-path")]
+    interactive_debug_url: Option<String>,
 }
 
 fn main() -> anyhow::Result<()> {

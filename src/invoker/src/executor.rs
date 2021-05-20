@@ -30,6 +30,7 @@ pub struct Executor<'a> {
     volumes: HashMap<String, Volume>,
     /// Utility for resolving path references
     path_resolver: PathResolver,
+    request_id: uuid::Uuid,
     work_dir: &'a Path,
     minion: &'a dyn minion::erased::Backend,
     sandbox_global_settings: &'a SandboxGlobalSettings,
@@ -40,6 +41,7 @@ impl<'a> Executor<'a> {
         work_dir: &'a Path,
         minion: &'a dyn minion::erased::Backend,
         sandbox_global_settings: &'a SandboxGlobalSettings,
+        request_id: uuid::Uuid,
     ) -> Self {
         Executor {
             files: HashMap::new(),
@@ -49,6 +51,7 @@ impl<'a> Executor<'a> {
             work_dir,
             minion,
             sandbox_global_settings,
+            request_id,
         }
     }
 
@@ -142,6 +145,7 @@ impl<'a> Executor<'a> {
                     sandbox_settings,
                     &self.sandbox_global_settings,
                     &self.path_resolver,
+                    self.request_id,
                 )
                 .await
                 .context("failed to create sandbox")?;

@@ -1,6 +1,9 @@
 use crate::{executor::path_resolver::PathResolver, interactive_debug::Suspender};
 use anyhow::Context as _;
-use invoker_api::invoke::{SandboxSettings, SharedDirectoryMode};
+use invoker_api::{
+    debug::AttachRequest,
+    invoke::{SandboxSettings, SharedDirectoryMode},
+};
 use minion::{SharedItem, SharedItemKind};
 use std::{
     os::unix::fs::PermissionsExt,
@@ -44,6 +47,7 @@ impl Sandbox {
         settings: &SandboxSettings,
         global_settings: &SandboxGlobalSettings,
         path_resolver: &PathResolver,
+        request_id: uuid::Uuid,
     ) -> anyhow::Result<Self> {
         let mut shared_items = vec![];
 
@@ -152,9 +156,14 @@ impl Sandbox {
             .new_sandbox(sandbox_options)
             .context("failed to create minion sandbox")?;
 
-        let debug_data = sandbox
+        let raw_debug_data = sandbox
             .debug_info()
             .context("failed to get sandbox debugging information")?;
+        let debug_data = AttachRequest {
+            raw: raw_debug_data,
+            request_id,
+            sandbox_name: settings.name.clone(),
+        };
         global_settings
             .suspender
             .suspend(debug_data)

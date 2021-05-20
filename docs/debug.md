@@ -10,3 +10,7 @@ Debugging workflow looks like:
 2. Send a request.
 3. Connect to sandbox using desired debugging tools.
 4. Resume sandbox.
+
+## `strace-debugger`
+We maintain an http-based debugger which automatically collects strace logs when enabled. This debugger
+does not disrupt invoker workflow.
