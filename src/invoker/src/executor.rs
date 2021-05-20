@@ -11,7 +11,7 @@ use invoker_api::invoke::{
     Action, ActionResult, CommandResult, EnvVarValue, FileId, Input, InputSource,
 };
 use minion::{
-    erased::ChildProcessOptions, InputSpecification, OutputSpecification, StdioSpecification,
+    ChildProcessOptions, Handle, InputSpecification, OutputSpecification, StdioSpecification,
 };
 use std::{
     collections::{
@@ -195,9 +195,9 @@ impl<'a> Executor<'a> {
                 let stderr = stderr.try_clone_inherit()?;
 
                 let stdio = StdioSpecification {
-                    stdin: InputSpecification::handle(stdin.into_raw()),
-                    stdout: OutputSpecification::handle(stdout.into_raw()),
-                    stderr: OutputSpecification::handle(stderr.into_raw()),
+                    stdin: InputSpecification::handle(Handle::new(stdin.into_raw())),
+                    stdout: OutputSpecification::handle(Handle::new(stdout.into_raw())),
+                    stderr: OutputSpecification::handle(Handle::new(stderr.into_raw())),
                 };
                 let mut opts = ChildProcessOptions {
                     path: (&command.argv[0]).into(),
@@ -209,11 +209,10 @@ impl<'a> Executor<'a> {
                         .map(|arg| arg.into())
                         .collect(),
                     environment: Vec::new(),
-                    sandbox: sandbox.clone(),
+                    extra_inherit: Vec::new(),
                     pwd: command.cwd.as_str().into(),
                     stdio,
                 };
-                let mut inherited_files = Vec::new();
                 for env in &command.env {
                     let value = match &env.value {
                         EnvVarValue::File(id) => {
@@ -222,7 +221,7 @@ impl<'a> Executor<'a> {
                                 .try_clone_inherit()
                                 .context("failed to create inheritable file copy")?;
                             let s = clone.as_raw().to_string();
-                            inherited_files.push(clone);
+                            opts.extra_inherit.push(Handle::new(clone.into_raw()));
                             s
                         }
                         EnvVarValue::Plain(plain) => plain.clone(),
@@ -231,7 +230,7 @@ impl<'a> Executor<'a> {
                     opts.environment.push(kv.into());
                 }
                 tracing::debug!(options = ?opts, "Creating child process");
-                let mut child_process = match self.minion.spawn(opts) {
+                let mut child_process = match self.minion.spawn(opts, sandbox.clone()) {
                     Ok(ch) => ch,
                     Err(err) => {
                         let spawn_error_id = uuid::Uuid::new_v4();
