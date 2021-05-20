@@ -19,3 +19,5 @@ docker tag jjs-invoker ghcr.io/jjs-dev/jjs-invoker:$TAG
 docker push ghcr.io/jjs-dev/jjs-invoker:$TAG
 docker tag jjs-invoker-shim ghcr.io/jjs-dev/jjs-invoker-shim:$TAG
 docker push ghcr.io/jjs-dev/jjs-invoker-shim:$TAG
+docker tag jjs-invoker-strace-debugger ghcr.io/jjs-dev/jjs-invoker-strace-debugger:$TAG
+docker push ghcr.io/jjs-dev/jjs-invoker-strace-debugger:$TAG
