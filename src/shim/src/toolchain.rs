@@ -89,15 +89,26 @@ impl ToolchainPuller {
     ) -> anyhow::Result<ImageConfig> {
         tracing::info!(target_dir=%target_dir.display(), "downloading image");
 
-        let already_exists = tokio::fs::metadata(target_dir).await.is_ok();
-        if already_exists {
-            tracing::info!("image is already available in local filesystem")
-        }
-        if !already_exists {
+        // touched if toolchain was downloaded successfully
+        let ok_file = target_dir.join(".pull-success");
+
+        let already_pulled = tokio::fs::metadata(&ok_file).await.is_ok();
+        if already_pulled {
+            tracing::info!(
+                "image is already available in local filesystem, skipping layers download"
+            )
+        } else {
+            if tokio::fs::metadata(target_dir).await.is_ok() {
+                tracing::info!("cleaning up previous failed pull attempt");
+                tokio::fs::remove_dir_all(target_dir)
+                    .await
+                    .with_context(|| format!("failed to remove {}", target_dir.display()))?;
+            }
             tokio::fs::create_dir(target_dir)
                 .await
                 .context("failed to create target dir")?;
         }
+
         let settings = {
             let tls = if self.disable_tls {
                 puller::Tls::Disable
@@ -107,9 +118,10 @@ impl ToolchainPuller {
 
             puller::PullSettings {
                 tls,
-                skip_layers: already_exists,
+                skip_layers: already_pulled,
             }
         };
+        tracing::debug!(settings = ?settings, "generated pull settings");
         let image_manifest = self
             .image_puller
             .pull(
@@ -124,14 +136,17 @@ impl ToolchainPuller {
             Manifest::S2(im_v2) => im_v2,
             _ => anyhow::bail!("Unsupported manifest: only schema2 is supported"),
         };
-        let config_blob = image_manifest.config_blob;
 
-        let runtime_config = config_blob
+        let runtime_config = image_manifest
+            .config_blob
             .runtime_config
             .context("image manifest does not have RunConfig")?;
 
         let image_config = ImageConfig::from_run_config(runtime_config)
             .context("failed to process config blob")?;
+        tokio::fs::write(ok_file, "OK")
+            .await
+            .context("failed to touch .pull-success file")?;
         tracing::info!("toolchain has been pulled successfully");
         Ok(image_config)
     }
