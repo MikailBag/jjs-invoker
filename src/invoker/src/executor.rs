@@ -229,7 +229,7 @@ impl<'a> Executor<'a> {
                     let kv = format!("{}={}", env.name, value);
                     opts.environment.push(kv.into());
                 }
-                tracing::debug!(options = ?opts, "Creating child process");
+                tracing::trace!(options = ?opts, "Creating child process");
                 let mut child_process = match self.minion.spawn(opts, sandbox.clone()) {
                     Ok(ch) => ch,
                     Err(err) => {
