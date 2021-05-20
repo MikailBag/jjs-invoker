@@ -151,7 +151,7 @@ impl Sandbox {
             cpu_time_limit,
             real_time_limit,
         };
-        tracing::debug!(options = ?sandbox_options, "Creating minion sandbox");
+        tracing::trace!(options = ?sandbox_options, "Creating minion sandbox");
         let sandbox = backend
             .new_sandbox(sandbox_options)
             .context("failed to create minion sandbox")?;
