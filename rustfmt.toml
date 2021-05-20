@@ -1,3 +1,6 @@
+
+# GENERATED FILE
+
 imports_granularity = "Crate"
 force_explicit_abi = true
 reorder_imports = true
