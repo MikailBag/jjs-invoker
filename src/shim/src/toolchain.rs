@@ -5,6 +5,7 @@ use dkregistry::v2::manifest::{Manifest, RuntimeConfig};
 use std::{
     collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
+    sync::Mutex,
 };
 
 #[derive(Clone)]
@@ -58,7 +59,7 @@ pub struct ToolchainPuller {
     // TODO: per-registry options
     disable_tls: bool,
     /// Cache for already pulled toolchains.
-    cache: HashMap<String, PulledToolchain>,
+    cache: Mutex<HashMap<String, PulledToolchain>>,
 }
 
 impl ToolchainPuller {
@@ -76,7 +77,7 @@ impl ToolchainPuller {
             image_puller,
             toolchains_dir: tooclhains_dir.to_path_buf(),
             disable_tls,
-            cache: HashMap::new(),
+            cache: Mutex::new(HashMap::new()),
         })
     }
 
@@ -153,8 +154,13 @@ impl ToolchainPuller {
 
     #[tracing::instrument(skip(self))]
     pub async fn resolve(&self, toolchain_image: &str) -> anyhow::Result<PulledToolchain> {
-        if let Some(info) = self.cache.get(toolchain_image) {
-            return Ok(info.clone());
+        {
+            // TODO: do not pull one image concurrently, instead one task should pull
+            // ond other should wait.
+            let cache = self.cache.lock().unwrap();
+            if let Some(info) = cache.get(toolchain_image) {
+                return Ok(info.clone());
+            }
         }
         let dirname = base64::encode(toolchain_image);
         let toolchain_dir = self.toolchains_dir.join(&dirname);
@@ -164,9 +170,14 @@ impl ToolchainPuller {
             .await
             .context("toolchain download error")?;
 
-        Ok(PulledToolchain {
+        let pt = PulledToolchain {
             path: dirname,
             image_config,
-        })
+        };
+        {
+            let mut cache = self.cache.lock().unwrap();
+            cache.insert(toolchain_image.to_string(), pt.clone());
+        }
+        Ok(pt)
     }
 }
