@@ -194,6 +194,10 @@ impl<'a> Executor<'a> {
                 let stdout = stdout.try_clone_inherit()?;
                 let stderr = stderr.try_clone_inherit()?;
 
+                stdin.rewind().await?;
+                stdout.rewind().await?;
+                stderr.rewind().await?;
+
                 let stdio = StdioSpecification {
                     stdin: InputSpecification::handle(Handle::new(stdin.into_raw())),
                     stdout: OutputSpecification::handle(Handle::new(stdout.into_raw())),
@@ -220,6 +224,7 @@ impl<'a> Executor<'a> {
                             let clone = file
                                 .try_clone_inherit()
                                 .context("failed to create inheritable file copy")?;
+                            clone.rewind().await?;
                             let s = clone.as_raw().to_string();
                             opts.extra_inherit.push(Handle::new(clone.into_raw()));
                             s
