@@ -140,6 +140,10 @@ impl File {
             mode: self.mode,
         })
     }
+
+    pub async fn rewind(&self) -> anyhow::Result<()> {
+        self.raw.rewind().await
+    }
 }
 
 fn create_parent_dir(path: &Path) -> anyhow::Result<()> {

@@ -52,13 +52,23 @@ impl RawFile {
         self.handle as u64
     }
 
-    pub async fn read_all(&self) -> anyhow::Result<Vec<u8>> {
-        let file = unsafe { tokio::fs::File::from_raw_fd(self.handle) };
-        // File destructor closes fd
-        let mut file = ManuallyDrop::new(file);
-        file.seek(SeekFrom::Start(0))
+    // we wrap File into ManuallyDrop because we do not want to
+    // close FD.
+    fn as_tokio(&self) -> ManuallyDrop<tokio::fs::File> {
+        ManuallyDrop::new(unsafe { FromRawFd::from_raw_fd(self.handle) })
+    }
+
+    pub async fn rewind(&self) -> anyhow::Result<()> {
+        let mut f = self.as_tokio();
+        f.seek(SeekFrom::Start(0))
             .await
             .context("failed to seek file to beginning")?;
+        Ok(())
+    }
+
+    pub async fn read_all(&self) -> anyhow::Result<Vec<u8>> {
+        self.rewind().await.context("failed to rewind file")?;
+        let mut file = self.as_tokio();
         let mut out = Vec::new();
         file.read_to_end(&mut out)
             .await
