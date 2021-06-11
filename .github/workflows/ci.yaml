@@ -101,12 +101,12 @@ jobs:
     steps:
     - name: Fetch sources
       uses: actions/checkout@v2
-    - name: Install nightly toolchain
+    - name: Install stable toolchain
       uses: actions-rs/toolchain@v1
       with:
         components: clippy,rustfmt
         override: "true"
-        toolchain: nightly
+        toolchain: stable
     - name: Setup cache
       uses: Swatinem/rust-cache@v1
     - id: cargo_udeps
@@ -123,7 +123,7 @@ jobs:
         mkdir -p ~/udeps
         cp $( which cargo-udeps ) ~/udeps
     - name: Run cargo-udeps
-      run: "\nexport PATH=~/udeps:$PATH  \ncargo udeps \n"
+      run: "\nexport PATH=~/udeps:$PATH\nexport RUSTC_BOOTSTRAP=1\ncargo udeps \n"
   rustfmt:
     name: rustfmt
     runs-on: ubuntu-20.04
