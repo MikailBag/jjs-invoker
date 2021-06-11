@@ -1,5 +1,5 @@
 dockerImages:
-  - jjs-invoker
-  - jjs-invoker-shim
-  - jjs-invoker-strace-debugger
+  - invoker
+  - invoker-shim
+  - invoker-strace-debugger
 buildTimeoutMinutes: 15
