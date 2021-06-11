@@ -1,8 +1,8 @@
 set -euxo pipefail
 
-skopeo copy dir:e2e-artifacts/invoker docker-daemon:jjs-invoker:latest
-skopeo copy dir:e2e-artifacts/shim docker-daemon:jjs-invoker-shim:latest
-skopeo copy dir:e2e-artifacts/debugger docker-daemon:jjs-invoker-strace-debugger:latest
+skopeo copy dir:e2e-artifacts/invoker docker-daemon:invoker:latest
+skopeo copy dir:e2e-artifacts/shim docker-daemon:invoker-shim:latest
+skopeo copy dir:e2e-artifacts/debugger docker-daemon:invoker-strace-debugger:latest
 
 
 mkdir e2e-logs
@@ -10,7 +10,7 @@ chmod +x e2e-artifacts/test-runner
 
 export DOCKER_BUILDKIT=1
     ./e2e-artifacts/test-runner \
-    --invoker-image=jjs-invoker \
-    --shim-image=jjs-invoker-shim \
-    --strace-debug-image=jjs-invoker-strace-debugger \
+    --invoker-image=invoker \
+    --shim-image=invoker-shim \
+    --strace-debug-image=invoker-strace-debugger \
     --logs=e2e-logs

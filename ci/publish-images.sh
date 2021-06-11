@@ -15,9 +15,9 @@ else
   exit 1
 fi
 echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
-docker tag jjs-invoker ghcr.io/jjs-dev/jjs-invoker:$TAG
-docker push ghcr.io/jjs-dev/jjs-invoker:$TAG
-docker tag jjs-invoker-shim ghcr.io/jjs-dev/jjs-invoker-shim:$TAG
-docker push ghcr.io/jjs-dev/jjs-invoker-shim:$TAG
-docker tag jjs-invoker-strace-debugger ghcr.io/jjs-dev/jjs-invoker-strace-debugger:$TAG
-docker push ghcr.io/jjs-dev/jjs-invoker-strace-debugger:$TAG
+docker tag invoker ghcr.io/jjs-dev/invoker:$TAG
+docker push ghcr.io/jjs-dev/invoker:$TAG
+docker tag invoker-shim ghcr.io/jjs-dev/invoker-shim:$TAG
+docker push ghcr.io/jjs-dev/invoker-shim:$TAG
+docker tag invoker-strace-debugger ghcr.io/jjs-dev/invoker-strace-debugger:$TAG
+docker push ghcr.io/jjs-dev/invoker-strace-debugger:$TAG
